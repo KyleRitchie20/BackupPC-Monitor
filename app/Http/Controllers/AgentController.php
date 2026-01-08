@@ -6,6 +6,7 @@ use App\Events\BackupDataUpdated;
 use App\Events\BackupStatusChanged;
 use App\Models\Site;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
@@ -137,12 +138,18 @@ class AgentController extends Controller
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
+        // Decrypt credentials
+        $backuppcPassword = $site->backuppc_password ? Crypt::decryptString($site->backuppc_password) : '';
+        $apiKey = $site->api_key ? Crypt::decryptString($site->api_key) : '';
+
         return response()->json([
             'site_id' => $site->id,
             'backuppc_url' => $site->backuppc_url,
             'polling_interval' => $site->polling_interval,
-            'backuppc_username' => $site->backuppc_username,
-            'auth_type' => $site->api_key ? 'api_key' : 'basic',
+            'backuppc_username' => $site->backuppc_username ?? '',
+            'backuppc_password' => $backuppcPassword,
+            'auth_type' => $apiKey ? 'api_key' : 'basic',
+            'api_key' => $apiKey,
             'dashboard_ws_url' => config('app.url') . '/reverb',
         ]);
     }

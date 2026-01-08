@@ -447,22 +447,49 @@ class BackupPCAgent
             $this->logger->warning("Failed to register with dashboard, continuing anyway...");
         }
 
-        // Get site configuration from dashboard
+        // Get site configuration from dashboard (includes credentials)
         $config = $this->dashboard->getSiteConfig();
         if ($config && isset($config['polling_interval'])) {
             $this->config['polling_interval'] = $config['polling_interval'];
             $this->logger->info("Using polling interval from dashboard: {$config['polling_interval']}s");
+
+            // Update BackupPC credentials from dashboard config
+            if (isset($config['backuppc_username']) && !empty($config['backuppc_username'])) {
+                $this->config['backuppc_username'] = $config['backuppc_username'];
+                $this->logger->debug("Using BackupPC username from dashboard");
+            }
+            if (isset($config['backuppc_password']) && !empty($config['backuppc_password'])) {
+                $this->config['backuppc_password'] = $config['backuppc_password'];
+                $this->logger->debug("Using BackupPC password from dashboard");
+            }
+            if (isset($config['api_key']) && !empty($config['api_key'])) {
+                $this->config['api_key'] = $config['api_key'];
+                $this->logger->debug("Using API key from dashboard");
+            }
+            if (isset($config['backuppc_url']) && !empty($config['backuppc_url'])) {
+                $this->config['backuppc_url'] = $config['backuppc_url'];
+                $this->logger->debug("Using BackupPC URL from dashboard");
+            }
+
+            // Reinitialize BackupPC client with updated credentials
+            $this->backuppc = new BackupPCClient($this->config, $this->logger);
         }
 
         // Initial data fetch
         $this->fetchAndSend();
 
-        // Main loop
-        $heartbeatInterval = $this->config['heartbeat_interval'] / $this->config['polling_interval'];
+        // Main loop - use time-based polling with short curl timeouts
+        $heartbeatInterval = (int)($this->config['heartbeat_interval'] / $this->config['polling_interval']);
         $lastHeartbeat = 0;
+        $sleepSeconds = $this->config['polling_interval'];
 
         while ($this->running) {
-            sleep($this->config['polling_interval']);
+            $nextRun = time() + $sleepSeconds;
+
+            // Wait until next run time, checking for shutdown frequently
+            while ($this->running && time() < $nextRun) {
+                usleep(100000); // Sleep for 100ms
+            }
 
             // Check for shutdown
             if (!$this->running) break;
@@ -566,20 +593,22 @@ class BackupPCAgent
     }
 }
 
-// Signal handlers for graceful shutdown
-$agent = null;
+// Global flag for signal handling
+$GLOBALS['shutdown_requested'] = false;
 
+// Signal handlers for graceful shutdown
 function signalHandler(int $signal): void
 {
-    global $agent;
-    if ($agent instanceof BackupPCAgent) {
-        $agent->stop();
-    }
-    exit(0);
+    $GLOBALS['shutdown_requested'] = true;
+    fwrite(STDERR, "\nReceived signal {$signal}, shutting down gracefully...\n");
 }
 
-pcntl_signal(SIGTERM, 'signalHandler');
-pcntl_signal(SIGINT, 'signalHandler');
+// Register signal handlers BEFORE creating the agent
+if (function_exists('pcntl_signal')) {
+    pcntl_signal(SIGTERM, 'signalHandler');
+    pcntl_signal(SIGINT, 'signalHandler');
+    pcntl_signal(SIGHUP, 'signalHandler');
+}
 
 // Create and run agent
 try {
