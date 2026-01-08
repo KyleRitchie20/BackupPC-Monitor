@@ -316,12 +316,13 @@ class BackupPCService
 
             $summary['total_hosts']++;
 
-            if ($data->state === 'Status_backup_in_progress') {
+            if ($data->error_message) {
+                $summary['failed_backups']++;
+            } elseif ($data->state === 'Status_backup_in_progress') {
                 $summary['backup_in_progress']++;
             } elseif ($data->state === 'Status_idle') {
+                $summary['successful_backups']++;
                 $summary['idle_hosts']++;
-            } elseif ($data->state === 'Status_idle' && $data->error_message) {
-                $summary['failed_backups']++;
             } else {
                 $summary['successful_backups']++;
             }
