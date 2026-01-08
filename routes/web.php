@@ -39,24 +39,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/fetch-all-backup-data', [\App\Http\Controllers\DashboardController::class, 'fetchAllBackupData'])->name('fetch.all.backup.data');
     Route::get('/get-backup-status', [\App\Http\Controllers\DashboardController::class, 'getBackupStatus'])->name('get.backup.status');
     Route::get('/download-report', [\App\Http\Controllers\DashboardController::class, 'downloadReport'])->name('download.report')->middleware('admin');
-
-    // Test route for debugging site creation
-    Route::get('/test-site-creation', function () {
-        $site = \App\Models\Site::create([
-            'name' => 'Test Site',
-            'description' => 'Test site created via test route',
-            'backuppc_url' => 'http://test.example.com',
-            'connection_method' => 'ssh',
-            'ssh_host' => 'test.example.com',
-            'ssh_port' => 22,
-            'ssh_username' => 'testuser',
-            'ssh_password' => \Illuminate\Support\Facades\Crypt::encryptString('testpassword'),
-            'polling_interval' => 30,
-            'is_active' => true
-        ]);
-
-        return response()->json(['success' => true, 'site_id' => $site->id]);
-    })->middleware('admin');
 });
 
 require __DIR__.'/auth.php';

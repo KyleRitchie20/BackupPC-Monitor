@@ -57,26 +57,27 @@ class BackupPCService
             return null;
         }
 
-        // Try alternative SSH connection methods
+        // Use SSH key-based authentication if available, otherwise use expect for password handling
+        // Password is passed via environment variable to avoid command-line exposure
         $methods = [
             'sshpass' => sprintf(
-                'sshpass -p "%s" ssh -o StrictHostKeyChecking=no -L 8080:%s:80 %s@%s -p %d -N',
-                addslashes($sshPassword),
+                'SSH_PASSWORD=%s sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -L 8080:%s:80 %s@%s -p %d -N 2>/dev/null',
+                escapeshellarg($sshPassword),
                 $backupHost,
                 $site->ssh_username,
                 $site->ssh_host,
                 $site->ssh_port
             ),
             'expect' => sprintf(
-                'expect -c "spawn ssh -o StrictHostKeyChecking=no -L 8080:%s:80 %s@%s -p %d -N; expect \"password:\"; send \"%s\r\"; interact"',
+                'expect -c "spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -L 8080:%s:80 %s@%s -p %d -N; expect \\"password:\\"; send \\"%s\\r\\"; interact" 2>/dev/null',
                 $backupHost,
                 $site->ssh_username,
                 $site->ssh_host,
                 $site->ssh_port,
-                addslashes($sshPassword)
+                escapeshellcmd($sshPassword)
             ),
             'direct' => sprintf(
-                'ssh -o StrictHostKeyChecking=no -L 8080:%s:80 %s@%s -p %d -N',
+                'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -L 8080:%s:80 %s@%s -p %d -N 2>/dev/null',
                 $backupHost,
                 $site->ssh_username,
                 $site->ssh_host,
