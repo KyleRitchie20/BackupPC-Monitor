@@ -14,6 +14,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
         ]);
+
+        // Exclude agent routes from CSRF protection
+        $middleware->validateCsrfTokens(except: [
+            'api/agent/*',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
