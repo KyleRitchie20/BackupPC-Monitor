@@ -189,7 +189,7 @@ class BackupPCClient
      */
     public function fetchMetrics(): ?array
     {
-        $url = $this->baseUrl . '/BackupPC_Admin?action=metrics&format=json';
+        $url = rtrim($this->baseUrl, '/') . '/BackupPC_Admin?action=metrics&format=json';
 
         $this->logger->debug("Fetching metrics from: {$url}");
 
@@ -199,8 +199,9 @@ class BackupPCClient
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 30,
             CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYPEER => false,  // Allow self-signed certificates
             CURLOPT_USERAGENT => 'BackupPC-Monitor-Agent/1.0',
+            CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
         ]);
 
         // Set authentication
@@ -208,28 +209,40 @@ class BackupPCClient
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 'Authorization: Bearer ' . $this->apiKey
             ]);
+            $this->logger->debug("Using API key authentication");
         } elseif ($this->username && $this->password) {
             curl_setopt($ch, CURLOPT_USERPWD, $this->username . ':' . $this->password);
+            $this->logger->debug("Using basic auth with username: {$this->username}");
+        } else {
+            $this->logger->warning("No authentication method configured for BackupPC");
         }
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
+        $errorNo = curl_errno($ch);
         curl_close($ch);
 
-        if ($error) {
-            $this->logger->error("cURL error: {$error}");
+        if ($errorNo !== 0) {
+            $this->logger->error("cURL error ({$errorNo}): {$error}");
+            return null;
+        }
+
+        if ($httpCode === 401) {
+            $this->logger->error("Authentication failed for BackupPC - check username/password or API key");
             return null;
         }
 
         if ($httpCode !== 200) {
-            $this->logger->warning("HTTP error {$httpCode} fetching metrics");
+            $this->logger->warning("HTTP error {$httpCode} fetching metrics from BackupPC");
+            $this->logger->debug("Response: " . substr($response, 0, 500));
             return null;
         }
 
         $data = json_decode($response, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
             $this->logger->error("Failed to parse JSON response: " . json_last_error_msg());
+            $this->logger->debug("Response: " . substr($response, 0, 500));
             return null;
         }
 
