@@ -65,6 +65,11 @@
                             <a href="{{ route('sites.downloadReport', $site) }}" class="ml-3 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
                                 {{ __('Download Report') }}
                             </a>
+                            @if($site->connection_method === 'agent')
+                                <a href="{{ route('sites.agent-config', $site) }}" class="ml-3 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
+                                    {{ __('Agent Config') }}
+                                </a>
+                            @endif
                         @endif
                     </div>
                 </div>

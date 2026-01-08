@@ -1,0 +1,32 @@
+[Unit]
+Description=BackupPC Monitor Agent
+After=network.target
+
+[Service]
+Type=simple
+User=backuppc
+Group=backuppc
+WorkingDirectory=/opt/backuppc-monitor-agent
+ExecStart=/usr/bin/php /opt/backuppc-monitor-agent/agent.php
+Restart=always
+RestartSec=10
+
+# Environment variables for configuration
+Environment=SITE_ID=1
+Environment=AGENT_TOKEN=your-agent-token-here
+Environment=DASHBOARD_URL=http://your-dashboard.example.com
+Environment=BACKUPPC_URL=http://localhost/BackupPC
+Environment=POLLING_INTERVAL=60
+Environment=HEARTBEAT_INTERVAL=300
+Environment=LOG_FILE=/var/log/backuppc-monitor-agent.log
+Environment=PID_FILE=/var/run/backuppc-monitor-agent.pid
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log /var/run
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

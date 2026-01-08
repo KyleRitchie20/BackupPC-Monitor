@@ -143,6 +143,37 @@ class SiteController extends Controller
     }
 
     /**
+     * Generate or regenerate agent token for a site.
+     */
+    public function generateAgentToken(Site $site)
+    {
+        if (!Auth::user()->isAdmin()) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $token = $site->generateAgentToken();
+
+        return redirect()->back()->with('success', 'Agent token regenerated for ' . $site->name . '. Token: ' . $token);
+    }
+
+    /**
+     * Show agent configuration for a site.
+     */
+    public function showAgentConfig(Site $site)
+    {
+        if (!Auth::user()->isAdmin()) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        // Generate token if not exists
+        if (!$site->agent_token) {
+            $site->generateAgentToken();
+        }
+
+        return view('sites.agent-config', compact('site'));
+    }
+
+    /**
      * Download backup report PDF for a specific site.
      */
     public function downloadReport(Site $site)

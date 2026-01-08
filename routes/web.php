@@ -24,6 +24,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/sites/{site}', [\App\Http\Controllers\SiteController::class, 'destroy'])->name('sites.destroy')->middleware('admin');
     Route::resource('sites', \App\Http\Controllers\SiteController::class)->only(['index', 'show']);
     Route::get('/sites/{site}/download-report', [\App\Http\Controllers\SiteController::class, 'downloadReport'])->name('sites.downloadReport')->middleware('admin');
+    Route::get('/sites/{site}/agent-config', [\App\Http\Controllers\SiteController::class, 'showAgentConfig'])->name('sites.agent-config')->middleware('admin');
+    Route::post('/sites/{site}/generate-token', [\App\Http\Controllers\SiteController::class, 'generateAgentToken'])->name('sites.generate-token')->middleware('admin');
 
     // Client user management routes
     Route::get('/client-users/dashboard', [\App\Http\Controllers\ClientUserController::class, 'dashboard'])->name('client-users.dashboard')->middleware('admin');
@@ -39,6 +41,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/fetch-all-backup-data', [\App\Http\Controllers\DashboardController::class, 'fetchAllBackupData'])->name('fetch.all.backup.data');
     Route::get('/get-backup-status', [\App\Http\Controllers\DashboardController::class, 'getBackupStatus'])->name('get.backup.status');
     Route::get('/download-report', [\App\Http\Controllers\DashboardController::class, 'downloadReport'])->name('download.report')->middleware('admin');
+});
+
+// Agent communication routes (no authentication required for agents)
+Route::prefix('api/agent')->group(function () {
+    Route::post('/data', [\App\Http\Controllers\AgentController::class, 'receiveData'])->name('agent.receive-data');
+    Route::post('/register', [\App\Http\Controllers\AgentController::class, 'registerAgent'])->name('agent.register');
+    Route::post('/config', [\App\Http\Controllers\AgentController::class, 'getSiteConfig'])->name('agent.config');
 });
 
 require __DIR__.'/auth.php';

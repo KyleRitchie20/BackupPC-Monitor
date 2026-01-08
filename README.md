@@ -174,6 +174,294 @@ After seeding, you can log in with:
 - CSRF protection on all forms
 - Password hashing for user authentication
 
+## Agent Setup (Push-Based Monitoring)
+
+The BackupPC Monitor Agent enables real-time, push-based monitoring of BackupPC servers. Agents run on each BackupPC server and send data directly to the dashboard, eliminating the need for the dashboard to poll individual servers.
+
+### How It Works
+
+1. Create a site with **Connection Method: Agent**
+2. Generate an agent token from the site management page
+3. Deploy the agent script to the BackupPC server
+4. Configure and start the agent
+5. View real-time data on the dashboard
+
+### Agent Architecture
+
+```
+┌─────────────────────┐         ┌─────────────────────┐
+│   BackupPC Server   │         │  Dashboard Server   │
+│                     │         │                     │
+│  ┌───────────────┐  │   HTTP  │  ┌───────────────┐  │
+│  │ BackupPC Agent│──┼────────>│  │   Dashboard   │  │
+│  │ (PHP Script)  │  │  POST   │  │   (Laravel)   │  │
+│  └───────────────┘  │         │  └───────────────┘  │
+│         │           │         │         │           │
+│         v           │         │         v           │
+│  ┌───────────────┐  │         │  ┌───────────────┐  │
+│  │ BackupPC CGI  │  │         │  │   Database    │  │
+│  │   API         │  │         │  │   (SQLite/PG) │  │
+│  └───────────────┘  │         │  └───────────────┘  │
+└─────────────────────┘         └─────────────────────┘
+```
+
+### Dashboard Setup
+
+#### 1. Create a Site with Agent Connection
+
+1. Log in to the dashboard as an admin
+2. Navigate to **Sites Management** → **Add New Site**
+3. Enter site details:
+   - **Name**: A descriptive name for this BackupPC server
+   - **BackupPC URL**: URL to the BackupPC server (e.g., `http://backuppc.internal/BackupPC`)
+   - **Connection Method**: Select **Agent**
+   - **Polling Interval**: Set to desired interval (ignored for agents)
+4. Save the site
+
+#### 2. Generate Agent Token
+
+1. Click on the site to view details
+2. Click **Agent Config** button
+3. The agent token will be auto-generated
+4. Copy the token or use the "Copy to clipboard" button
+
+### BackupPC Server Setup
+
+#### 1. Copy Agent Files to BackupPC Server
+
+Transfer the `agent/` directory from the dashboard to your BackupPC server:
+
+```bash
+# From your local machine or dashboard server
+scp -r /path/to/BackupPC-Monitor/agent/ backuppc@backuppc-server:/opt/backuppc-monitor-agent/
+```
+
+#### 2. Configure the Agent
+
+Copy the example configuration and edit it:
+
+```bash
+ssh backuppc@backuppc-server
+cd /opt/backuppc-monitor-agent
+cp config.example.php config.php
+nano config.php
+```
+
+Edit `config.php` with your settings:
+
+```php
+<?php
+return [
+    // Dashboard configuration
+    'dashboard_url' => 'http://your-dashboard.example.com',
+    'site_id' => 1,  // Site ID from the dashboard
+    'agent_token' => 'your-agent-token-from-dashboard',
+
+    // BackupPC server configuration
+    'backuppc_url' => 'http://localhost/BackupPC',
+    'backuppc_username' => '',  // Leave empty if not needed
+    'backuppc_password' => '',  // Leave empty if not needed
+    'api_key' => '',            // Leave empty if using username/password
+
+    // Agent settings
+    'polling_interval' => 60,   // Seconds between data fetches
+    'heartbeat_interval' => 300, // Seconds between heartbeats
+    'log_file' => '/var/log/backuppc-monitor-agent.log',
+    'pid_file' => '/var/run/backuppc-monitor-agent.pid',
+];
+```
+
+#### 3. Test the Agent
+
+Run the agent manually to verify it works:
+
+```bash
+php /opt/backuppc-monitor-agent/agent.php \
+    --site-id=1 \
+    --agent-token=your-token-here \
+    --dashboard-url=http://your-dashboard.example.com
+```
+
+You should see logs indicating successful registration and data sending.
+
+#### 4. Install as a Systemd Service (Recommended)
+
+Copy the systemd service file:
+
+```bash
+sudo cp /opt/backuppc-monitor-agent/backuppc-monitor-agent.service /etc/systemd/system/
+sudo chmod 644 /etc/systemd/system/backuppc-monitor-agent.service
+```
+
+Edit the service file to set your configuration:
+
+```bash
+sudo nano /etc/systemd/system/backuppc-monitor-agent.service
+```
+
+Update the environment variables:
+
+```ini
+[Service]
+Environment=SITE_ID=1
+Environment=AGENT_TOKEN=your-agent-token-here
+Environment=DASHBOARD_URL=http://your-dashboard.example.com
+Environment=BACKUPPC_URL=http://localhost/BackupPC
+Environment=POLLING_INTERVAL=60
+Environment=HEARTBEAT_INTERVAL=300
+Environment=LOG_FILE=/var/log/backuppc-monitor-agent.log
+Environment=PID_FILE=/var/run/backuppc-monitor-agent.pid
+```
+
+Enable and start the service:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable backuppc-monitor-agent
+sudo systemctl start backuppc-monitor-agent
+```
+
+Check the status:
+
+```bash
+sudo systemctl status backuppc-monitor-agent
+sudo journalctl -u backuppc-monitor-agent -f
+```
+
+### Agent Command Line Options
+
+```
+Usage: php agent.php [OPTIONS]
+
+Options:
+    --site-id           Site ID in the dashboard (required)
+    --agent-token       Agent authentication token (required)
+    --dashboard-url     URL of the central dashboard
+    --backuppc-url      URL to BackupPC server (default: http://localhost/BackupPC)
+    --username          BackupPC username for authentication
+    --password          BackupPC password for authentication
+    --api-key           BackupPC API key (alternative to username/password)
+    --interval          Polling interval in seconds (default: 60)
+    --log               Path to log file
+    --help              Show this help message
+```
+
+### Agent Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| SITE_ID | Site ID from dashboard | Yes |
+| AGENT_TOKEN | Agent authentication token | Yes |
+| DASHBOARD_URL | Dashboard URL | Yes |
+| BACKUPPC_URL | BackupPC server URL | No |
+| BACKUPPC_USERNAME | BackupPC username | No |
+| BACKUPPC_PASSWORD | BackupPC password | No |
+| BACKUPPC_API_KEY | BackupPC API key | No |
+| POLLING_INTERVAL | Seconds between fetches | No |
+| HEARTBEAT_INTERVAL | Seconds between heartbeats | No |
+| LOG_FILE | Path to log file | No |
+| PID_FILE | Path to PID file | No |
+
+### Monitoring Agent Status
+
+From the dashboard:
+
+1. Navigate to **Sites Management**
+2. Click on the site with agent connection
+3. Click **Agent Config**
+4. View the agent status:
+   - **Agent Connected** (green): Agent is actively sending data
+   - **Agent Configured (Offline)** (yellow): Token configured but no recent contact
+   - **Agent Not Configured** (gray): No token generated
+
+### Troubleshooting
+
+**Agent Won't Start:**
+```bash
+# Check PHP is installed
+php --version
+
+# Check file permissions
+chmod +x agent.php
+ls -la /opt/backuppc-monitor-agent/
+
+# Test configuration
+php agent.php --help
+```
+
+**Agent Can't Connect to Dashboard:**
+```bash
+# Verify dashboard URL is accessible from BackupPC server
+curl -I http://your-dashboard.example.com
+
+# Check agent token is correct
+# View the token in Dashboard → Sites → Agent Config
+
+# Check firewall allows outbound connections
+sudo ufw status
+```
+
+**Agent Can't Connect to BackupPC:**
+```bash
+# Verify BackupPC URL is accessible locally
+curl -I http://localhost/BackupPC
+
+# Check BackupPC CGI is installed
+ls /usr/local/BackupPC/cgi-bin/BackupPC_Admin
+
+# Check BackupPC logs
+sudo tail -f /var/log/BackupPC/BackupPC.log
+```
+
+**No Data Appearing on Dashboard:**
+```bash
+# Check agent logs
+tail -f /var/log/backuppc-monitor-agent.log
+
+# Verify agent token matches site
+# Dashboard → Sites → Agent Config
+
+# Check dashboard receives data
+# Look for POST requests to /api/agent/data
+```
+
+**Service Fails to Start:**
+```bash
+# Check systemd service status
+sudo systemctl status backuppc-monitor-agent
+
+# Check service logs
+sudo journalctl -u backuppc-monitor-agent -n 100
+
+# Check file permissions
+ls -la /var/log/backuppc-monitor-agent.log
+ls -la /var/run/backuppc-monitor-agent.pid
+```
+
+### Agent File Structure
+
+```
+agent/
+├── agent.php                    # Main agent script
+├── backuppc-monitor-agent.service  # Systemd service file
+├── config.example.php           # Configuration template
+└── README.md                    # Agent-specific documentation
+```
+
+### Security Considerations
+
+1. **Agent Token**: Keep the agent token secure. It authenticates the agent to the dashboard.
+2. **File Permissions**: Set restrictive permissions on config files:
+   ```bash
+   chmod 600 /opt/backuppc-monitor-agent/config.php
+   ```
+3. **Firewall**: Only allow outbound HTTPS to the dashboard server.
+4. **Service User**: Run the agent as a non-root user (backuppc):
+   ```ini
+   User=backuppc
+   Group=backuppc
+   ```
+
 ## Troubleshooting
 
 ### Common Issues
@@ -218,6 +506,9 @@ Modify the `BackupPCService` to include additional metrics and update the dashbo
 | `/fetch-backup-data` | POST | Fetch data for specific site | Required |
 | `/fetch-all-backup-data` | POST | Fetch data for all sites | Admin only |
 | `/get-backup-status` | GET | Get backup status summary | Required |
+| `/api/agent/data` | POST | Receive data from agents | Agent Token |
+| `/api/agent/register` | POST | Register agent with dashboard | Agent Token |
+| `/api/agent/config` | POST | Get site configuration | Agent Token |
 
 ## Deployment
 
