@@ -363,9 +363,3 @@ class SiteController extends Controller
         ]);
     }
 }
-        return view('sites.backups', [
-            'site' => $site,
-            'processedBackups' => collect($processedBackups)
-        ]);
-    }
-}
