@@ -73,7 +73,7 @@
                             @endphp
                             <tr>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <a href="{{ route('sites.show', $site) }}" class="text-blue-600 hover:text-blue-900">
+                                    <a href="{{ route('sites.backups', $site) }}" class="text-blue-600 hover:text-blue-900">
                                         {{ $site->name }}
                                     </a>
                                 </td>
