@@ -33,7 +33,7 @@
                     </x-nav-link>
                     
                     <!-- Reports -->
-                    <x-nav-link :href="route('download.report')" :active="request()->routeIs('download.report')">
+                    <x-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.*')">
                         {{ __('Reports') }}
                     </x-nav-link>
                     @endif
@@ -123,7 +123,7 @@
             <x-responsive-nav-link :href="route('client-users.create')" :active="request()->routeIs('client-users.create')">
                 {{ __('Add Client') }}
             </x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('download.report')" :active="request()->routeIs('download.report')">
+            <x-responsive-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.*')">
                 {{ __('Reports') }}
             </x-responsive-nav-link>
             @endif

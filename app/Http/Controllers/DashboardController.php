@@ -119,6 +119,20 @@ class DashboardController extends Controller
     }
 
     /**
+     * Show reports page with all sites and download options
+     */
+    public function reports()
+    {
+        if (!Auth::user()->isAdmin()) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $sites = Site::all();
+
+        return view('reports.index', compact('sites'));
+    }
+
+    /**
      * Download backup report PDF for all sites (admin only)
      */
     public function downloadReport()

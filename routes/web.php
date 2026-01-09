@@ -50,6 +50,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/fetch-backup-data', [\App\Http\Controllers\DashboardController::class, 'fetchBackupData'])->name('fetch.backup.data');
     Route::post('/fetch-all-backup-data', [\App\Http\Controllers\DashboardController::class, 'fetchAllBackupData'])->name('fetch.all.backup.data');
     Route::get('/get-backup-status', [\App\Http\Controllers\DashboardController::class, 'getBackupStatus'])->name('get.backup.status');
+    Route::get('/reports', [\App\Http\Controllers\DashboardController::class, 'reports'])->name('reports.index')->middleware('admin');
     Route::get('/download-report', [\App\Http\Controllers\DashboardController::class, 'downloadReport'])->name('download.report')->middleware('admin');
 });
 
