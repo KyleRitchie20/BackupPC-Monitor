@@ -68,6 +68,8 @@
                         @foreach($sites as $site)
                             @php
                                 $summary = $backupService->getBackupStatusSummary($site);
+                                $hasAgent = !empty($site->agent_token);
+                                $agentActive = $hasAgent && $site->last_agent_contact && $site->last_agent_contact->gt(now()->subMinutes(10));
                             @endphp
                             <tr>
                                 <td class="px-6 py-4 whitespace-nowrap">
@@ -80,9 +82,23 @@
                                 <td class="px-6 py-4 whitespace-nowrap">{{ $summary['failed_backups'] }}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">{{ $summary['disk_usage'] }}%</td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="px-2 py-1 rounded text-sm {{ $site->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
-                                        {{ $site->is_active ? 'Active' : 'Inactive' }}
-                                    </span>
+                                    @if($hasAgent)
+                                        <span class="px-2 py-1 rounded text-sm {{ $agentActive ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
+                                            {{ $agentActive ? 'Agent Connected' : 'Agent Offline' }}
+                                        </span>
+                                    @else
+                                        <span class="px-2 py-1 rounded text-sm {{ $site->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                            {{ $site->is_active ? 'Active' : 'Inactive' }}
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    @if($hasAgent)
+                                        <button onclick="sendAgentCommand({{ $site->id }}, 'refresh')"
+                                                class="px-4 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700">
+                                            Refresh Now
+                                        </button>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach
@@ -132,15 +148,22 @@
                 </div>
             </div>
 
+            <!-- User Management Card -->
+            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <h4 class="text-md font-medium mb-2">User Management</h4>
+                <div class="space-y-2">
+                    <a href="{{ route('users.index') }}" class="block w-full text-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Manage Users</a>
+                    <a href="{{ route('users.create') }}" class="block w-full text-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">Add New User</a>
+                </div>
+            </div>
+
             <!-- Client Management Card -->
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Client Management</h3>
-                    <div class="space-y-3">
-                        <a href="{{ route('client-users.dashboard') }}" class="block w-full text-center px-4 py-3 bg-purple-600 text-white rounded-md hover:bg-purple-700">Client Dashboard</a>
-                        <a href="{{ route('client-users.create') }}" class="block w-full text-center px-4 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Add New Client</a>
-                        <a href="{{ route('client-users.index') }}" class="block w-full text-center px-4 py-3 bg-pink-600 text-white rounded-md hover:bg-pink-700">Manage Clients</a>
-                    </div>
+            <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <h4 class="text-md font-medium mb-2">Client Management</h4>
+                <div class="space-y-2">
+                    <a href="{{ route('client-users.dashboard') }}" class="block w-full text-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Client Dashboard</a>
+                    <a href="{{ route('client-users.create') }}" class="block w-full text-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">Add New Client</a>
+                    <a href="{{ route('client-users.index') }}" class="block w-full text-center px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm">Manage Clients</a>
                 </div>
             </div>
         </div>
@@ -210,6 +233,34 @@
 </div>
 
 <script>
+    function sendAgentCommand(siteId, command) {
+        if (!confirm('Send ' + command + ' command to agent for site ID ' + siteId + '?')) {
+            return;
+        }
+
+        fetch('/api/agent/command/' + siteId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ command: command })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Command sent successfully! The agent should refresh its data shortly.');
+            } else {
+                alert('Failed to send command: ' + (data.message || data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while sending the command.');
+        });
+    }
+
     function fetchAllBackupData() {
         if (!confirm('Are you sure you want to manually fetch backup data for ALL sites? This may take a while.')) {
             return;

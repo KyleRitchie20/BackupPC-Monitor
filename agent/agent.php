@@ -35,6 +35,7 @@ $CONFIG = [
     'log_file' => getenv('LOG_FILE') ?: '/var/log/backuppc-monitor-agent.log',
     'pid_file' => getenv('PID_FILE') ?: '/var/run/backuppc-monitor-agent.pid',
     'heartbeat_interval' => (int)(getenv('HEARTBEAT_INTERVAL') ?: '300'), // seconds
+    'ws_poll_interval' => (int)(getenv('WS_POLL_INTERVAL') ?: '30'), // seconds for command polling
 ];
 
 // Parse command line arguments
@@ -193,60 +194,101 @@ class BackupPCClient
 
         $this->logger->debug("Fetching metrics from: {$url}");
 
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_SSL_VERIFYPEER => false,  // Allow self-signed certificates
-            CURLOPT_USERAGENT => 'BackupPC-Monitor-Agent/1.0',
-            CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
-        ]);
+        // Try multiple authentication methods
+        $methods = [];
 
-        // Set authentication
+        // Method 1: No authentication (if BackupPC allows localhost access)
+        if (!$this->apiKey && !$this->username && !$this->password) {
+            $methods[] = ['type' => 'none'];
+        }
+
+        // Method 2: Basic auth with username/password
+        if ($this->username && $this->password) {
+            $methods[] = ['type' => 'basic', 'username' => $this->username, 'password' => $this->password];
+        }
+
+        // Method 3: API key as Basic auth password (common BackupPC setup)
+        if ($this->apiKey && $this->username) {
+            $methods[] = ['type' => 'basic', 'username' => $this->username, 'password' => $this->apiKey];
+        }
+
+        // Method 4: API key as Bearer token
         if ($this->apiKey) {
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Authorization: Bearer ' . $this->apiKey
+            $methods[] = ['type' => 'bearer', 'token' => $this->apiKey];
+        }
+
+        // Method 5: API key as X-BackupPC-Key header
+        if ($this->apiKey) {
+            $methods[] = ['type' => 'header', 'key' => 'X-BackupPC-Key', 'value' => $this->apiKey];
+        }
+
+        $lastError = '';
+        foreach ($methods as $method) {
+            $this->logger->debug("Trying authentication method: {$method['type']}");
+
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => $url,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_USERAGENT => 'BackupPC-Monitor-Agent/1.0',
             ]);
-            $this->logger->debug("Using API key authentication");
-        } elseif ($this->username && $this->password) {
-            curl_setopt($ch, CURLOPT_USERPWD, $this->username . ':' . $this->password);
-            $this->logger->debug("Using basic auth with username: {$this->username}");
-        } else {
-            $this->logger->warning("No authentication method configured for BackupPC");
+
+            switch ($method['type']) {
+                case 'basic':
+                    curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+                    curl_setopt($ch, CURLOPT_USERPWD, $method['username'] . ':' . $method['password']);
+                    break;
+                case 'bearer':
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                        'Authorization: Bearer ' . $method['token']
+                    ]);
+                    break;
+                case 'header':
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                        $method['key'] . ': ' . $method['value']
+                    ]);
+                    break;
+                case 'none':
+                    // No authentication
+                    break;
+            }
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            $errorNo = curl_errno($ch);
+            curl_close($ch);
+
+            if ($errorNo !== 0) {
+                $lastError = "cURL error ({$errorNo}): {$error}";
+                continue;
+            }
+
+            if ($httpCode === 200) {
+                $data = json_decode($response, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $this->logger->info("Successfully authenticated with BackupPC using {$method['type']} method");
+                    return $data;
+                }
+            }
+
+            if ($httpCode === 401) {
+                $lastError = "401 Unauthorized with {$method['type']} method";
+                continue;
+            }
+
+            if ($httpCode !== 200) {
+                $lastError = "HTTP error {$httpCode}";
+                $this->logger->warning("HTTP error {$httpCode} fetching metrics from BackupPC");
+                $this->logger->debug("Response: " . substr($response, 0, 500));
+            }
         }
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        $errorNo = curl_errno($ch);
-        curl_close($ch);
-
-        if ($errorNo !== 0) {
-            $this->logger->error("cURL error ({$errorNo}): {$error}");
-            return null;
-        }
-
-        if ($httpCode === 401) {
-            $this->logger->error("Authentication failed for BackupPC - check username/password or API key");
-            return null;
-        }
-
-        if ($httpCode !== 200) {
-            $this->logger->warning("HTTP error {$httpCode} fetching metrics from BackupPC");
-            $this->logger->debug("Response: " . substr($response, 0, 500));
-            return null;
-        }
-
-        $data = json_decode($response, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            $this->logger->error("Failed to parse JSON response: " . json_last_error_msg());
-            $this->logger->debug("Response: " . substr($response, 0, 500));
-            return null;
-        }
-
-        return $data;
+        $this->logger->error("All authentication methods failed. Last error: {$lastError}");
+        return null;
     }
 
     /**
@@ -478,7 +520,9 @@ class BackupPCAgent
         // Initial data fetch
         $this->fetchAndSend();
 
-        // Main loop - use time-based polling with short curl timeouts
+        // Command polling settings
+        $commandPollInterval = $this->config['ws_poll_interval'] ?? 30;
+        $lastCommandPoll = 0;
         $heartbeatInterval = (int)($this->config['heartbeat_interval'] / $this->config['polling_interval']);
         $lastHeartbeat = 0;
         $sleepSeconds = $this->config['polling_interval'];
@@ -494,6 +538,13 @@ class BackupPCAgent
             // Check for shutdown
             if (!$this->running) break;
 
+            // Poll for commands from dashboard
+            $lastCommandPoll++;
+            if ($lastCommandPoll >= ($commandPollInterval / $this->config['polling_interval'])) {
+                $this->pollForCommands();
+                $lastCommandPoll = 0;
+            }
+
             // Fetch and send data
             $this->fetchAndSend();
 
@@ -506,6 +557,118 @@ class BackupPCAgent
         }
 
         $this->logger->info("Agent shutdown complete");
+    }
+
+    /**
+     * Poll for commands from the dashboard
+     */
+    private function pollForCommands(): void
+    {
+        $this->logger->debug("Polling for commands from dashboard");
+
+        $url = rtrim($this->config['dashboard_url'], '/') . '/api/agent/command/poll';
+        $data = [
+            'site_id' => $this->config['site_id'],
+            'agent_token' => $this->config['agent_token'],
+        ];
+
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($data),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 5,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ],
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode === 200) {
+            $result = json_decode($response, true);
+            if (json_last_error() === JSON_ERROR_NONE && isset($result['command'])) {
+                $this->handleCommand($result);
+            }
+        }
+    }
+
+    /**
+     * Handle a command received from the dashboard
+     */
+    private function handleCommand(array $command): void
+    {
+        $cmd = $command['command'] ?? 'unknown';
+        $commandId = $command['command_id'] ?? 'unknown';
+
+        $this->logger->info("Received command: {$cmd}", ['command_id' => $commandId]);
+
+        switch ($cmd) {
+            case 'refresh':
+                $this->logger->info("Executing refresh command");
+                $this->fetchAndSend();
+                $this->acknowledgeCommand($commandId);
+                break;
+
+            case 'status':
+                $this->logger->info("Executing status command");
+                $this->dashboard->sendHeartbeat();
+                $this->acknowledgeCommand($commandId);
+                break;
+
+            case 'restart':
+                $this->logger->info("Executing restart command");
+                $this->acknowledgeCommand($commandId);
+                $this->cleanupPidFile();
+                exec('php ' . escapeshellarg(__FILE__) . ' --site-id=' . $this->config['site_id'] . ' --agent-token=' . escapeshellarg($this->config['agent_token']) . ' --dashboard-url=' . escapeshellarg($this->config['dashboard_url']) . ' > /dev/null 2>&1 &');
+                $this->running = false;
+                break;
+
+            case 'stop':
+                $this->logger->info("Executing stop command");
+                $this->acknowledgeCommand($commandId);
+                $this->running = false;
+                break;
+
+            default:
+                $this->logger->warning("Unknown command: {$cmd}");
+                break;
+        }
+    }
+
+    /**
+     * Acknowledge a command was executed
+     */
+    private function acknowledgeCommand(string $commandId): void
+    {
+        $url = rtrim($this->config['dashboard_url'], '/') . '/api/agent/command/ack';
+        $data = [
+            'site_id' => $this->config['site_id'],
+            'agent_token' => $this->config['agent_token'],
+            'command_id' => $commandId,
+            'status' => 'executed',
+            'result' => 'success',
+        ];
+
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($data),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 5,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ],
+        ]);
+
+        curl_exec($ch);
+        curl_close($ch);
     }
 
     /**

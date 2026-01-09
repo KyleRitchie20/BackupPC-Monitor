@@ -21,7 +21,12 @@
                     <x-nav-link :href="route('sites.index')" :active="request()->routeIs('sites.*')">
                         {{ __('Sites') }}
                     </x-nav-link>
-                    
+
+                    <!-- Administrators -->
+                    <x-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')">
+                        {{ __('Administrators') }}
+                    </x-nav-link>
+
                     <!-- Clients -->
                     <x-nav-link :href="route('client-users.index')" :active="request()->routeIs('client-users.*')">
                         {{ __('Clients') }}
@@ -105,6 +110,12 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('sites.create')" :active="request()->routeIs('sites.create')">
                 {{ __('Add Site') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('users.index')" :active="request()->routeIs('users.*')">
+                {{ __('All Administrators') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('users.create')" :active="request()->routeIs('users.create')">
+                {{ __('Add Administrator') }}
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('client-users.index')" :active="request()->routeIs('client-users.*')">
                 {{ __('All Clients') }}

@@ -27,6 +27,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/sites/{site}/agent-config', [\App\Http\Controllers\SiteController::class, 'showAgentConfig'])->name('sites.agent-config')->middleware('admin');
     Route::post('/sites/{site}/generate-token', [\App\Http\Controllers\SiteController::class, 'generateAgentToken'])->name('sites.generate-token')->middleware('admin');
 
+    // User management routes (admin users and general user management)
+    Route::get('/users', [\App\Http\Controllers\UserController::class, 'index'])->name('users.index')->middleware('admin');
+    Route::get('/users/create', [\App\Http\Controllers\UserController::class, 'create'])->name('users.create')->middleware('admin');
+    Route::post('/users', [\App\Http\Controllers\UserController::class, 'store'])->name('users.store')->middleware('admin');
+    Route::get('/users/{user}', [\App\Http\Controllers\UserController::class, 'show'])->name('users.show')->middleware('admin');
+    Route::get('/users/{user}/edit', [\App\Http\Controllers\UserController::class, 'edit'])->name('users.edit')->middleware('admin');
+    Route::put('/users/{user}', [\App\Http\Controllers\UserController::class, 'update'])->name('users.update')->middleware('admin');
+    Route::delete('/users/{user}', [\App\Http\Controllers\UserController::class, 'destroy'])->name('users.destroy')->middleware('admin');
+
     // Client user management routes
     Route::get('/client-users/dashboard', [\App\Http\Controllers\ClientUserController::class, 'dashboard'])->name('client-users.dashboard')->middleware('admin');
     Route::get('/client-users', [\App\Http\Controllers\ClientUserController::class, 'index'])->name('client-users.index')->middleware('admin');
@@ -48,6 +57,14 @@ Route::prefix('api/agent')->group(function () {
     Route::post('/data', [\App\Http\Controllers\AgentController::class, 'receiveData'])->name('agent.receive-data');
     Route::post('/register', [\App\Http\Controllers\AgentController::class, 'registerAgent'])->name('agent.register');
     Route::post('/config', [\App\Http\Controllers\AgentController::class, 'getSiteConfig'])->name('agent.config');
+    Route::post('/command/poll', [\App\Http\Controllers\AgentController::class, 'pollCommand'])->name('agent.command.poll');
+    Route::post('/command/ack', [\App\Http\Controllers\AgentController::class, 'acknowledgeCommand'])->name('agent.command.ack');
+});
+
+// Agent command routes (admin only)
+Route::middleware(['auth', 'admin'])->prefix('api/agent')->group(function () {
+    Route::post('/command/{siteId}', [\App\Http\Controllers\AgentCommandController::class, 'sendCommand'])->name('agent.command');
+    Route::post('/command/bulk/refresh', [\App\Http\Controllers\AgentCommandController::class, 'bulkRefresh'])->name('agent.command.bulk');
 });
 
 require __DIR__.'/auth.php';

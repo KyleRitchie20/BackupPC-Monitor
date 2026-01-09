@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\AgentCommandEvent;
 use App\Events\BackupDataUpdated;
 use App\Events\BackupStatusChanged;
 use App\Models\Site;
@@ -213,5 +214,78 @@ class AgentController extends Controller
                 'raw_data' => $data['cpool'],
             ]);
         }
+    }
+
+    /**
+     * Poll for pending commands (long-polling)
+     */
+    public function pollCommand(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'site_id' => 'required|exists:sites,id',
+            'agent_token' => 'required|exists:sites,agent_token',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['error' => 'Invalid data'], 422);
+        }
+
+        $site = Site::find($request->site_id);
+
+        if (!$site || $site->agent_token !== $request->agent_token) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        // Check for pending commands using session/cache
+        $commandKey = "agent_command:{$site->id}";
+        $pendingCommand = cache()->pull($commandKey);
+
+        if ($pendingCommand) {
+            Log::info("Sending pending command to agent for site: {$site->name}", [
+                'command' => $pendingCommand['command'] ?? 'unknown',
+            ]);
+
+            return response()->json([
+                'command_id' => uniqid('cmd_', true),
+                'command' => $pendingCommand['command'],
+                'payload' => $pendingCommand['payload'] ?? [],
+                'timestamp' => now()->toIso8601String(),
+            ]);
+        }
+
+        // No pending command
+        return response()->json(['command' => null]);
+    }
+
+    /**
+     * Acknowledge command execution
+     */
+    public function acknowledgeCommand(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'site_id' => 'required|exists:sites,id',
+            'agent_token' => 'required|exists:sites,agent_token',
+            'command_id' => 'nullable|string',
+            'status' => 'required|string',
+            'result' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['error' => 'Invalid data'], 422);
+        }
+
+        $site = Site::find($request->site_id);
+
+        if (!$site || $site->agent_token !== $request->agent_token) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        Log::info("Agent acknowledged command", [
+            'site' => $site->name,
+            'command_id' => $request->command_id,
+            'status' => $request->status,
+        ]);
+
+        return response()->json(['success' => true]);
     }
 }
