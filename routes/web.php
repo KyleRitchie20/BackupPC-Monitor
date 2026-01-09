@@ -23,6 +23,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/sites/{site}', [\App\Http\Controllers\SiteController::class, 'update'])->name('sites.update')->middleware('admin');
     Route::delete('/sites/{site}', [\App\Http\Controllers\SiteController::class, 'destroy'])->name('sites.destroy')->middleware('admin');
     Route::resource('sites', \App\Http\Controllers\SiteController::class)->only(['index', 'show']);
+    Route::get('/sites/{site}/backups', [\App\Http\Controllers\SiteController::class, 'showBackups'])->name('sites.backups');
     Route::get('/sites/{site}/download-report', [\App\Http\Controllers\SiteController::class, 'downloadReport'])->name('sites.downloadReport')->middleware('admin');
     Route::get('/sites/{site}/agent-config', [\App\Http\Controllers\SiteController::class, 'showAgentConfig'])->name('sites.agent-config')->middleware('admin');
     Route::post('/sites/{site}/generate-token', [\App\Http\Controllers\SiteController::class, 'generateAgentToken'])->name('sites.generate-token')->middleware('admin');

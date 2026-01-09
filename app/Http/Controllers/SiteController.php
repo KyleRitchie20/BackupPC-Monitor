@@ -290,4 +290,18 @@ class SiteController extends Controller
 
         return round($bytes / pow(1024, $i), 2) . ' ' . $units[$i];
     }
+
+    /**
+     * Display the backups for the specified site.
+     */
+    public function showBackups(Site $site)
+    {
+        if (!Auth::user()->isAdmin() && Auth::user()->site_id != $site->id) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $backupData = $site->backupData()->where('disabled', false)->get();
+
+        return view('sites.backups', compact('site', 'backupData'));
+    }
 }

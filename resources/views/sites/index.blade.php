@@ -47,7 +47,7 @@
                                             </span>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            <a href="{{ route('sites.show', $site) }}" class="text-blue-600 hover:text-blue-900 mr-2">View</a>
+                                            <a href="{{ route('sites.backups', $site) }}" class="text-blue-600 hover:text-blue-900 mr-2">View</a>
                                             @if(Auth::user()->isAdmin())
                                                 <a href="{{ route('sites.edit', $site) }}" class="text-yellow-600 hover:text-yellow-900 mr-2">Edit</a>
                                                 <form action="{{ route('sites.destroy', $site) }}" method="POST" class="inline">
