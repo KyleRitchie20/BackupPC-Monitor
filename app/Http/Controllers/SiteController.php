@@ -153,7 +153,9 @@ class SiteController extends Controller
 
         $token = $site->generateAgentToken();
 
-        return redirect()->back()->with('success', 'Agent token regenerated for ' . $site->name . '. Token: ' . $token);
+        // Store token in session instead of displaying in URL/redirect
+        session()->flash('agent_token', $token);
+        return redirect()->back()->with('success', 'Agent token regenerated for ' . $site->name . '. Token has been copied to clipboard.');
     }
 
     /**
@@ -355,6 +357,12 @@ class SiteController extends Controller
             ];
         }
 
+        return view('sites.backups', [
+            'site' => $site,
+            'processedBackups' => collect($processedBackups)
+        ]);
+    }
+}
         return view('sites.backups', [
             'site' => $site,
             'processedBackups' => collect($processedBackups)

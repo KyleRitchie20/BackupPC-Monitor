@@ -141,13 +141,43 @@ class AgentLogger
         $this->initialized = true;
     }
 
+    /**
+     * Filter sensitive data from log messages
+     */
+    private function filterSensitiveData(string $message, array $context = []): array
+    {
+        $sensitiveKeys = ['agent_token', 'password', 'api_key', 'token'];
+
+        // Filter message
+        foreach ($sensitiveKeys as $key) {
+            if (str_contains($message, $key)) {
+                $message = preg_replace('/' . $key . '.*?(\s|$)/i', $key . ': ***REDACTED***$1', $message);
+            }
+        }
+
+        // Filter context
+        $filteredContext = [];
+        foreach ($context as $key => $value) {
+            if (in_array(strtolower($key), $sensitiveKeys)) {
+                $filteredContext[$key] = '***REDACTED***';
+            } else {
+                $filteredContext[$key] = $value;
+            }
+        }
+
+        return [$message, $filteredContext];
+    }
+
     public function log(string $level, string $message, array $context = []): void
     {
         $this->init();
 
+        // Filter sensitive data before logging
+        [$filteredMessage, $filteredContext] = $this->filterSensitiveData($message, $context);
+
         $timestamp = date('Y-m-d H:i:s');
-        $contextStr = !empty($context) ? ' ' . json_encode($context) : '';
-        $logLine = "[{$timestamp}] [{$level}] {$message}{$contextStr}\n";
+        $contextStr = !empty($filteredContext) ? ' ' . json_encode($filteredContext) : '';
+        $logLine = "[{$timestamp}] [{$level}] {$filteredMessage}{$contextStr}\n";
 
         @file_put_contents($this->logFile, $logLine, FILE_APPEND | LOCK_EX);
 
@@ -232,7 +262,8 @@ class BackupPCClient
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_TIMEOUT => 30,
                 CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYPEER => true,  // Enable SSL verification for security
+                CURLOPT_SSL_VERIFYHOST => 2,
                 CURLOPT_USERAGENT => 'BackupPC-Monitor-Agent/1.0',
             ]);
 
@@ -624,7 +655,16 @@ class BackupPCAgent
                 $this->logger->info("Executing restart command");
                 $this->acknowledgeCommand($commandId);
                 $this->cleanupPidFile();
-                exec('php ' . escapeshellarg(__FILE__) . ' --site-id=' . $this->config['site_id'] . ' --agent-token=' . escapeshellarg($this->config['agent_token']) . ' --dashboard-url=' . escapeshellarg($this->config['dashboard_url']) . ' > /dev/null 2>&1 &');
+
+                // Secure restart with proper parameter escaping
+                $command = 'php ' . escapeshellarg(__FILE__) .
+                          ' --site-id=' . escapeshellarg((string)$this->config['site_id']) .
+                          ' --agent-token=' . escapeshellarg($this->config['agent_token']) .
+                          ' --dashboard-url=' . escapeshellarg($this->config['dashboard_url']) .
+                          ' > /dev/null 2>&1 &';
+
+                $this->logger->debug("Restarting with command: " . str_replace($this->config['agent_token'], '***REDACTED***', $command));
+                exec($command);
                 $this->running = false;
                 break;
 

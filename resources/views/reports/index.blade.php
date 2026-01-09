@@ -23,9 +23,6 @@
                     </div>
 
                     @php
-                        use App\Models\BackupData;
-                        use App\Services\BackupPCService;
-
                         $backupService = new BackupPCService();
                         $totalHosts = 0;
                         $totalSuccessful = 0;
