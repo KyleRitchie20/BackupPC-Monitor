@@ -29,7 +29,7 @@
                         </div>
                     </div>
 
-                    @if($backupData->isEmpty())
+                    @if($processedBackups->isEmpty())
                         <div class="text-center py-8">
                             <p class="text-gray-500 dark:text-gray-300">No backup data available for this site.</p>
                         </div>
@@ -48,60 +48,26 @@
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                    @foreach($backupData as $backup)
-                                        @php
-                                            $fullBackupAge = $this->calculateFullBackupAge($backup);
-                                            $incrementalAge = $this->calculateIncrementalAge($backup);
-
-                                            // Determine status classes
-                                            $fullBackupAgeClass = $fullBackupAge > 14 ? 'text-red-600' : ($fullBackupAge > 7 ? 'text-yellow-600' : 'text-green-600');
-                                            $incrementalAgeClass = $incrementalAge > 7 ? 'text-red-600' : ($incrementalAge > 3 ? 'text-yellow-600' : 'text-green-600');
-
-                                            // Determine overall status
-                                            $status = 'Healthy';
-                                            $statusClass = 'bg-green-100 text-green-800';
-
-                                            if ($fullBackupAge > 14 || $incrementalAge > 7) {
-                                                $status = 'Critical';
-                                                $statusClass = 'bg-red-100 text-red-800';
-                                            } elseif ($fullBackupAge > 7 || $incrementalAge > 3) {
-                                                $status = 'Warning';
-                                                $statusClass = 'bg-yellow-100 text-yellow-800';
-                                            }
-
-                                            // Determine state display
-                                            $stateDisplay = $backup->state;
-                                            $stateClass = 'bg-gray-100 text-gray-800';
-                                            if(str_contains($backup->state, 'backup_in_progress')) {
-                                                $stateDisplay = 'In Progress';
-                                                $stateClass = 'bg-blue-100 text-blue-800';
-                                            } elseif(str_contains($backup->state, 'idle') && $backup->error_message) {
-                                                $stateDisplay = 'Failed';
-                                                $stateClass = 'bg-red-100 text-red-800';
-                                            } elseif(str_contains($backup->state, 'idle')) {
-                                                $stateDisplay = 'Idle';
-                                                $stateClass = 'bg-green-100 text-green-800';
-                                            }
-                                        @endphp
+                                    @foreach($processedBackups as $backup)
                                         <tr>
-                                            <td class="px-6 py-4 whitespace-nowrap font-medium">{{ $backup->host_name }}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap font-medium">{{ $backup['host_name'] }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap">
-                                                <span class="px-2 py-1 rounded text-sm {{ $stateClass }}">{{ $stateDisplay }}</span>
+                                                <span class="px-2 py-1 rounded text-sm {{ $backup['stateClass'] }}">{{ $backup['stateDisplay'] }}</span>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap {{ $fullBackupAgeClass }}">
-                                                {{ $fullBackupAge === 0 ? 'N/A' : $fullBackupAge . ' days' }}
+                                            <td class="px-6 py-4 whitespace-nowrap {{ $backup['fullBackupAgeClass'] }}">
+                                                {{ $backup['fullBackupAge'] }}
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap {{ $incrementalAgeClass }}">
-                                                {{ $incrementalAge === 0 ? 'N/A' : $incrementalAge . ' days' }}
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                {{ $backup->last_backup_size ? $this->formatSize($backup->last_backup_size) : 'N/A' }}
+                                            <td class="px-6 py-4 whitespace-nowrap {{ $backup['incrementalAgeClass'] }}">
+                                                {{ $backup['incrementalAge'] }}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
-                                                <span class="px-2 py-1 rounded text-sm {{ $statusClass }}">{{ $status }}</span>
+                                                {{ $backup['sizeFormatted'] }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="px-2 py-1 rounded text-sm {{ $backup['statusClass'] }}">{{ $backup['status'] }}</span>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {{ $backup->updated_at->diffForHumans() }}
+                                                {{ $backup['updated_at']->diffForHumans() }}
                                             </td>
                                         </tr>
                                     @endforeach

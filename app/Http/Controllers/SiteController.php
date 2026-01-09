@@ -302,6 +302,59 @@ class SiteController extends Controller
 
         $backupData = $site->backupData()->where('disabled', false)->get();
 
-        return view('sites.backups', compact('site', 'backupData'));
+        // Process backup data for display
+        $processedBackups = [];
+        foreach ($backupData as $backup) {
+            $fullBackupAge = $this->calculateFullBackupAge($backup);
+            $incrementalAge = $this->calculateIncrementalAge($backup);
+
+            // Determine status classes
+            $fullBackupAgeClass = $fullBackupAge > 14 ? 'text-red-600' : ($fullBackupAge > 7 ? 'text-yellow-600' : 'text-green-600');
+            $incrementalAgeClass = $incrementalAge > 7 ? 'text-red-600' : ($incrementalAge > 3 ? 'text-yellow-600' : 'text-green-600');
+
+            // Determine overall status
+            $status = 'Healthy';
+            $statusClass = 'bg-green-100 text-green-800';
+
+            if ($fullBackupAge > 14 || $incrementalAge > 7) {
+                $status = 'Critical';
+                $statusClass = 'bg-red-100 text-red-800';
+            } elseif ($fullBackupAge > 7 || $incrementalAge > 3) {
+                $status = 'Warning';
+                $statusClass = 'bg-yellow-100 text-yellow-800';
+            }
+
+            // Determine state display
+            $stateDisplay = $backup->state;
+            $stateClass = 'bg-gray-100 text-gray-800';
+            if(str_contains($backup->state, 'backup_in_progress')) {
+                $stateDisplay = 'In Progress';
+                $stateClass = 'bg-blue-100 text-blue-800';
+            } elseif(str_contains($backup->state, 'idle') && $backup->error_message) {
+                $stateDisplay = 'Failed';
+                $stateClass = 'bg-red-100 text-red-800';
+            } elseif(str_contains($backup->state, 'idle')) {
+                $stateDisplay = 'Idle';
+                $stateClass = 'bg-green-100 text-green-800';
+            }
+
+            $processedBackups[] = [
+                'id' => $backup->id,
+                'host_name' => $backup->host_name,
+                'state' => $backup->state,
+                'stateDisplay' => $stateDisplay,
+                'stateClass' => $stateClass,
+                'fullBackupAge' => $fullBackupAge === 0 ? 'N/A' : $fullBackupAge . ' days',
+                'fullBackupAgeClass' => $fullBackupAgeClass,
+                'incrementalAge' => $incrementalAge === 0 ? 'N/A' : $incrementalAge . ' days',
+                'incrementalAgeClass' => $incrementalAgeClass,
+                'sizeFormatted' => $this->formatSize($backup->last_backup_size ?? 0),
+                'status' => $status,
+                'statusClass' => $statusClass,
+                'updated_at' => $backup->updated_at,
+            ];
+        }
+
+        return view('sites.backups', compact('site', 'processedBackups'));
     }
 }
