@@ -5,14 +5,6 @@
                 {{ __('Administrator Details') }}
             </h2>
             <div class="flex space-x-2">
-                @if($user->site)
-                    <form action="{{ route('users.send-test-report', $user) }}" method="POST" class="inline-block">
-                        @csrf
-                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2" onclick="return confirm('Are you sure you want to send a test report to this user?')">
-                            Send Test Report
-                        </button>
-                    </form>
-                @endif
                 <a href="{{ route('users.edit', $user) }}" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
                     Edit Administrator
                 </a>

@@ -41,8 +41,14 @@
                                             {{ $client->site ? $client->site->name : 'No site assigned' }}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            <a href="{{ route('client-users.edit', $client) }}" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300">Edit</a>
-                                            <form action="{{ route('client-users.destroy', $client) }}" method="POST" class="inline-block ml-2">
+                                            @if($client->site)
+                                                <form action="{{ route('client-users.send-test-report', $client) }}" method="POST" class="inline-block">
+                                                    @csrf
+                                                    <button type="submit" class="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300 mr-2" onclick="return confirm('Are you sure you want to send a test report to this client?')">Send Test Report</button>
+                                                </form>
+                                            @endif
+                                            <a href="{{ route('client-users.edit', $client) }}" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 mr-2">Edit</a>
+                                            <form action="{{ route('client-users.destroy', $client) }}" method="POST" class="inline-block">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300" onclick="return confirm('Are you sure you want to delete this client?')">Delete</button>

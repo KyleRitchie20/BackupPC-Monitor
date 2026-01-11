@@ -43,6 +43,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/client-users', [\App\Http\Controllers\ClientUserController::class, 'index'])->name('client-users.index')->middleware('admin');
     Route::get('/client-users/create', [\App\Http\Controllers\ClientUserController::class, 'create'])->name('client-users.create')->middleware('admin');
     Route::post('/client-users', [\App\Http\Controllers\ClientUserController::class, 'store'])->name('client-users.store')->middleware('admin');
+    Route::post('/client-users/{client_user}/send-test-report', [\App\Http\Controllers\ClientUserController::class, 'sendTestReport'])->name('client-users.send-test-report')->middleware('admin');
     Route::get('/client-users/{client_user}/edit', [\App\Http\Controllers\ClientUserController::class, 'edit'])->name('client-users.edit')->middleware('admin');
     Route::put('/client-users/{client_user}', [\App\Http\Controllers\ClientUserController::class, 'update'])->name('client-users.update')->middleware('admin');
     Route::delete('/client-users/{client_user}', [\App\Http\Controllers\ClientUserController::class, 'destroy'])->name('client-users.destroy')->middleware('admin');
