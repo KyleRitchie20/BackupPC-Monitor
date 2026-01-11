@@ -294,20 +294,21 @@ class UserController extends Controller
      */
     protected function sendTestReportEmail(User $user, Site $site, $pdfPath)
     {
-        Mail::send([], [], function ($message) use ($user, $site, $pdfPath) {
+        $htmlContent = "
+            <html>
+            <body>
+                <p>Hi {$user->name},</p>
+                <p>This is a test backup report for {$site->name}. Please find the report attached.</p>
+                <p>This report was generated on: " . now()->format('Y-m-d H:i:s') . "</p>
+                <p>Best regards,<br>BackupPC Monitor</p>
+            </body>
+            </html>
+        ";
+
+        Mail::raw($htmlContent, function ($message) use ($user, $site, $pdfPath) {
             $message->to($user->email)
                 ->subject("Test Backup Report - {$site->name} - " . now()->format('Y-m-d'))
-                ->attach($pdfPath)
-                ->setBody("
-                    <html>
-                    <body>
-                        <p>Hi {$user->name},</p>
-                        <p>This is a test backup report for {$site->name}. Please find the report attached.</p>
-                        <p>This report was generated on: " . now()->format('Y-m-d H:i:s') . "</p>
-                        <p>Best regards,<br>BackupPC Monitor</p>
-                    </body>
-                    </html>
-                ", 'text/html');
+                ->attach($pdfPath);
         });
     }
 
