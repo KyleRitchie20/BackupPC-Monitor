@@ -12,9 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('sites', function (Blueprint $table) {
-            $table->string('agent_token', 100)->nullable()->after('api_key');
-            $table->string('agent_version', 20)->nullable()->after('agent_token');
-            $table->timestamp('last_agent_contact')->nullable()->after('agent_version');
+            if (!Schema::hasColumn('sites', 'agent_token')) {
+                $table->string('agent_token', 100)->nullable()->after('api_key');
+            }
+            if (!Schema::hasColumn('sites', 'agent_version')) {
+                $table->string('agent_version', 20)->nullable()->after('agent_token');
+            }
+            if (!Schema::hasColumn('sites', 'last_agent_contact')) {
+                $table->timestamp('last_agent_contact')->nullable()->after('agent_version');
+            }
         });
     }
 
@@ -24,7 +30,18 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('sites', function (Blueprint $table) {
-            $table->dropColumn(['agent_token', 'agent_version', 'last_agent_contact']);
+            $columns = ['agent_token', 'agent_version', 'last_agent_contact'];
+            $existingColumns = [];
+
+            foreach ($columns as $column) {
+                if (Schema::hasColumn('sites', $column)) {
+                    $existingColumns[] = $column;
+                }
+            }
+
+            if (!empty($existingColumns)) {
+                $table->dropColumn($existingColumns);
+            }
         });
     }
 };
