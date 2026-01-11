@@ -33,6 +33,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/users/create', [\App\Http\Controllers\UserController::class, 'create'])->name('users.create')->middleware('admin');
     Route::post('/users', [\App\Http\Controllers\UserController::class, 'store'])->name('users.store')->middleware('admin');
     Route::get('/users/{user}', [\App\Http\Controllers\UserController::class, 'show'])->name('users.show')->middleware('admin');
+    Route::post('/users/{user}/send-test-report', [\App\Http\Controllers\UserController::class, 'sendTestReport'])->name('users.send-test-report')->middleware('admin');
     Route::get('/users/{user}/edit', [\App\Http\Controllers\UserController::class, 'edit'])->name('users.edit')->middleware('admin');
     Route::put('/users/{user}', [\App\Http\Controllers\UserController::class, 'update'])->name('users.update')->middleware('admin');
     Route::delete('/users/{user}', [\App\Http\Controllers\UserController::class, 'destroy'])->name('users.destroy')->middleware('admin');
