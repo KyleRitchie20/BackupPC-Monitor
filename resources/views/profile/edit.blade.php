@@ -26,4 +26,37 @@
             </div>
         </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const frequencySelect = document.getElementById('report_frequency');
+            const dailyOptions = document.getElementById('daily-options');
+            const weeklyOptions = document.getElementById('weekly-options');
+            const monthlyOptions = document.getElementById('monthly-options');
+
+            function toggleOptions() {
+                const value = frequencySelect.value;
+
+                // Hide all options first
+                dailyOptions.style.display = 'none';
+                weeklyOptions.style.display = 'none';
+                monthlyOptions.style.display = 'none';
+
+                // Show relevant options based on selection
+                if (value === 'daily') {
+                    dailyOptions.style.display = 'block';
+                } else if (value === 'weekly') {
+                    weeklyOptions.style.display = 'block';
+                } else if (value === 'monthly') {
+                    monthlyOptions.style.display = 'block';
+                }
+            }
+
+            // Initial check
+            toggleOptions();
+
+            // Listen for changes
+            frequencySelect.addEventListener('change', toggleOptions);
+        });
+    </script>
 </x-app-layout>

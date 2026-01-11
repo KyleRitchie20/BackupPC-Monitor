@@ -22,7 +22,9 @@ class User extends Authenticatable
         'email',
         'password',
         'role_id',
-        'site_id'
+        'site_id',
+        'report_frequency',
+        'report_days'
     ];
 
     /**
@@ -45,6 +47,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'report_days' => 'array',
         ];
     }
 

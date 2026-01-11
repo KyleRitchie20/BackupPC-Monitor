@@ -25,6 +25,9 @@ class ProfileUpdateRequest extends FormRequest
                 'max:255',
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
+            'report_frequency' => ['nullable', 'in:daily,weekly,monthly'],
+            'report_days' => ['nullable', 'array'],
+            'report_days.*' => ['in:monday,tuesday,wednesday,thursday,friday,saturday,sunday'],
         ];
     }
 }
