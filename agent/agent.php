@@ -116,6 +116,39 @@ if (empty($CONFIG['site_id']) || empty($CONFIG['agent_token'])) {
     exit(1);
 }
 
+// Input validation and sanitization
+if ($CONFIG['site_id'] <= 0 || $CONFIG['site_id'] > 999999) {
+    fwrite(STDERR, "ERROR: Site ID must be a positive integer between 1 and 999999.\n");
+    exit(1);
+}
+
+if (strlen($CONFIG['agent_token']) < 16 || strlen($CONFIG['agent_token']) > 128) {
+    fwrite(STDERR, "ERROR: Agent token must be between 16 and 128 characters long.\n");
+    exit(1);
+}
+
+// Validate URL lengths to prevent buffer overflow attacks
+if (strlen($CONFIG['dashboard_url']) > 2048) {
+    fwrite(STDERR, "ERROR: Dashboard URL is too long (max 2048 characters).\n");
+    exit(1);
+}
+
+if (strlen($CONFIG['backuppc_url']) > 2048) {
+    fwrite(STDERR, "ERROR: BackupPC URL is too long (max 2048 characters).\n");
+    exit(1);
+}
+
+// Validate file paths are reasonable length
+if (strlen($CONFIG['log_file']) > 255) {
+    fwrite(STDERR, "ERROR: Log file path is too long (max 255 characters).\n");
+    exit(1);
+}
+
+if (strlen($CONFIG['pid_file']) > 255) {
+    fwrite(STDERR, "ERROR: PID file path is too long (max 255 characters).\n");
+    exit(1);
+}
+
 /**
  * Logger class for the agent
  */
@@ -434,10 +467,37 @@ class DashboardClient
     }
 
     /**
+     * Validate URL format and protocol
+     */
+    private function validateUrl(string $url): bool
+    {
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        // Only allow HTTP/HTTPS protocols
+        if (!preg_match('/^https?:\/\//', $url)) {
+            return false;
+        }
+
+        // Basic length check to prevent extremely long URLs
+        if (strlen($url) > 2048) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Make POST request to dashboard
      */
     private function post(string $url, array $data): ?array
     {
+        if (!$this->validateUrl($url)) {
+            $this->logger->error("Invalid URL provided: {$url}");
+            return null;
+        }
+
         $ch = curl_init();
         curl_setopt_array($ch, [
             CURLOPT_URL => $url,
@@ -445,9 +505,12 @@ class DashboardClient
             CURLOPT_POSTFIELDS => json_encode($data),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => true,  // Enable SSL verification for security
+            CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/json',
                 'Accept: application/json',
+                'User-Agent' => 'BackupPC-Monitor-Agent/1.0',
             ],
         ]);
 
@@ -493,6 +556,7 @@ class BackupPCAgent
     private array $previousHostStatus = [];
     private bool $running = true;
     private int $heartbeatCounter = 0;
+    private array $commandTimestamps = []; // For rate limiting
 
     public function __construct(array $config)
     {
@@ -629,10 +693,36 @@ class BackupPCAgent
     }
 
     /**
+     * Check if command rate limit is exceeded
+     */
+    private function checkRateLimit(): bool
+    {
+        $now = time();
+        // Keep only commands from the last minute
+        $this->commandTimestamps = array_filter($this->commandTimestamps,
+            fn($ts) => $ts > $now - 60);
+
+        // Allow maximum 10 commands per minute
+        if (count($this->commandTimestamps) >= 10) {
+            $this->logger->warning("Command rate limit exceeded (10 commands per minute)");
+            return false;
+        }
+
+        $this->commandTimestamps[] = $now;
+        return true;
+    }
+
+    /**
      * Handle a command received from the dashboard
      */
     private function handleCommand(array $command): void
     {
+        // Check rate limiting first
+        if (!$this->checkRateLimit()) {
+            $this->logger->warning("Command rejected due to rate limiting");
+            return;
+        }
+
         $cmd = $command['command'] ?? 'unknown';
         $commandId = $command['command_id'] ?? 'unknown';
 
