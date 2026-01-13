@@ -36,6 +36,7 @@ $CONFIG = [
     'pid_file' => getenv('PID_FILE') ?: '/var/run/backuppc-monitor-agent.pid',
     'heartbeat_interval' => (int)(getenv('HEARTBEAT_INTERVAL') ?: '300'), // seconds
     'ws_poll_interval' => (int)(getenv('WS_POLL_INTERVAL') ?: '30'), // seconds for command polling
+    'dashboard_pubkey' => getenv('DASHBOARD_PUBKEY') ?: '', // Optional: dashboard public key for certificate pinning
 ];
 
 // Parse command line arguments
@@ -467,17 +468,25 @@ class DashboardClient
     }
 
     /**
-     * Validate URL format and protocol
+     * Validate URL format and enforce HTTPS for dashboard URLs
      */
-    private function validateUrl(string $url): bool
+    private function validateUrl(string $url, bool $requireHttps = false): bool
     {
         if (!filter_var($url, FILTER_VALIDATE_URL)) {
             return false;
         }
 
-        // Only allow HTTP/HTTPS protocols
-        if (!preg_match('/^https?:\/\//', $url)) {
-            return false;
+        // For dashboard URLs, enforce HTTPS only
+        if ($requireHttps) {
+            if (!preg_match('/^https:\/\//', $url)) {
+                $this->logger->error("Dashboard URLs must use HTTPS protocol: {$url}");
+                return false;
+            }
+        } else {
+            // For BackupPC URLs, allow HTTP/HTTPS but prefer HTTPS
+            if (!preg_match('/^https?:\/\//', $url)) {
+                return false;
+            }
         }
 
         // Basic length check to prevent extremely long URLs
@@ -489,12 +498,51 @@ class DashboardClient
     }
 
     /**
+     * Initialize cURL handle with secure defaults for dashboard communication
+     */
+    public function curlInit(string $url): \CurlHandle
+    {
+        if (!$this->validateUrl($url, true)) {  // Require HTTPS for dashboard URLs
+            throw new \Exception("Invalid dashboard URL: {$url}");
+        }
+
+        $ch = curl_init();
+        $options = [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => true,  // Enable SSL verification for security
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_USERAGENT => 'BackupPC-Monitor-Agent/1.0',
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ],
+            // Harden redirect handling - only allow HTTPS redirects, max 3 redirects
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 3,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
+        ];
+
+        // Add certificate pinning if dashboard public key is configured
+        global $CONFIG;
+        if (!empty($CONFIG['dashboard_pubkey'])) {
+            $this->logger->debug("Using certificate pinning for dashboard communication");
+            $options[CURLOPT_PINNEDPUBLICKEY] = $CONFIG['dashboard_pubkey'];
+        }
+
+        curl_setopt_array($ch, $options);
+        return $ch;
+    }
+
+    /**
      * Make POST request to dashboard
      */
     private function post(string $url, array $data): ?array
     {
-        if (!$this->validateUrl($url)) {
-            $this->logger->error("Invalid URL provided: {$url}");
+        if (!$this->validateUrl($url, true)) {  // Require HTTPS for dashboard URLs
+            $this->logger->error("Invalid dashboard URL provided: {$url}");
             return null;
         }
 
@@ -628,6 +676,18 @@ class BackupPCAgent
             // Wait until next run time, checking for shutdown frequently
             while ($this->running && time() < $nextRun) {
                 usleep(100000); // Sleep for 100ms
+
+                // Dispatch pending signals for reliable shutdown handling
+                if (function_exists('pcntl_signal_dispatch')) {
+                    pcntl_signal_dispatch();
+                }
+
+                // Check global shutdown flag
+                if ($GLOBALS['shutdown_requested']) {
+                    $this->logger->info("Shutdown requested via signal");
+                    $this->running = false;
+                    break;
+                }
             }
 
             // Check for shutdown
@@ -667,28 +727,32 @@ class BackupPCAgent
             'agent_token' => $this->config['agent_token'],
         ];
 
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($data),
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 5,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Accept: application/json',
-            ],
-        ]);
+        try {
+            $ch = $this->dashboard->curlInit($url);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+            curl_setopt($ch, CURLOPT_TIMEOUT, 5);  // Shorter timeout for polling
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
 
-        if ($httpCode === 200) {
-            $result = json_decode($response, true);
-            if (json_last_error() === JSON_ERROR_NONE && isset($result['command'])) {
-                $this->handleCommand($result);
+            if ($error) {
+                $this->logger->warning("Failed to poll for commands: {$error}");
+                return;
             }
+
+            if ($httpCode === 200) {
+                $result = json_decode($response, true);
+                if (json_last_error() === JSON_ERROR_NONE && isset($result['command'])) {
+                    $this->handleCommand($result);
+                }
+            } else {
+                $this->logger->debug("Command poll returned HTTP {$httpCode}");
+            }
+        } catch (\Exception $e) {
+            $this->logger->error("Exception during command polling: " . $e->getMessage());
         }
     }
 
@@ -742,21 +806,11 @@ class BackupPCAgent
                 break;
 
             case 'restart':
-                $this->logger->info("Executing restart command");
+                $this->logger->info("Executing restart command - exiting for systemd restart");
                 $this->acknowledgeCommand($commandId);
                 $this->cleanupPidFile();
-
-                // Secure restart with proper parameter escaping
-                $command = 'php ' . escapeshellarg(__FILE__) .
-                          ' --site-id=' . escapeshellarg((string)$this->config['site_id']) .
-                          ' --agent-token=' . escapeshellarg($this->config['agent_token']) .
-                          ' --dashboard-url=' . escapeshellarg($this->config['dashboard_url']) .
-                          ' > /dev/null 2>&1 &';
-
-                $this->logger->debug("Restarting with command: " . str_replace($this->config['agent_token'], '***REDACTED***', $command));
-                exec($command);
-                $this->running = false;
-                break;
+                // Exit cleanly and let systemd handle restart (Restart=on-failure or Restart=always)
+                exit(0);
 
             case 'stop':
                 $this->logger->info("Executing stop command");
@@ -784,21 +838,17 @@ class BackupPCAgent
             'result' => 'success',
         ];
 
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($data),
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 5,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Accept: application/json',
-            ],
-        ]);
+        try {
+            $ch = $this->dashboard->curlInit($url);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+            curl_setopt($ch, CURLOPT_TIMEOUT, 5);  // Shorter timeout for acknowledgments
 
-        curl_exec($ch);
-        curl_close($ch);
+            curl_exec($ch);
+            curl_close($ch);
+        } catch (\Exception $e) {
+            $this->logger->error("Failed to acknowledge command: " . $e->getMessage());
+        }
     }
 
     /**
