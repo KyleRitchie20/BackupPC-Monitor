@@ -1,32 +1,38 @@
 [Unit]
 Description=BackupPC Monitor Agent
 After=network.target
+Wants=network.target
 
 [Service]
 Type=simple
-User=backuppc
-Group=backuppc
-WorkingDirectory=/opt/backuppc-monitor-agent
-ExecStart=/usr/bin/php /opt/backuppc-monitor-agent/agent.php
-Restart=always
+User=backuppc-agent
+Group=backuppc-agent
+WorkingDirectory=/opt/backuppc-monitor/agent
+ExecStart=/usr/bin/php /opt/backuppc-monitor/agent/agent.php
+Restart=on-failure
 RestartSec=10
 
-# Environment variables for configuration
-Environment=SITE_ID=1
-Environment=AGENT_TOKEN=your-agent-token-here
-Environment=DASHBOARD_URL=http://your-dashboard.example.com
-Environment=BACKUPPC_URL=http://localhost/BackupPC
-Environment=POLLING_INTERVAL=60
-Environment=HEARTBEAT_INTERVAL=300
-Environment=LOG_FILE=/var/log/backuppc-monitor-agent.log
-Environment=PID_FILE=/var/run/backuppc-monitor-agent.pid
+# Environment variables (optional - config.php is preferred)
+# Environment=SITE_ID=1
+# Environment=AGENT_TOKEN=your-agent-token-here
+# Environment=DASHBOARD_URL=https://your-dashboard.example.com
+# Environment=BACKUPPC_URL=http://localhost/BackupPC
+# Environment=DASHBOARD_PUBKEY=/etc/ssl/dashboard-pubkey.pem
 
 # Security hardening
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/log /var/run
+ReadWritePaths=/var/log /var/run /opt/backuppc-monitor
 PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=backuppc-agent
 
 [Install]
 WantedBy=multi-user.target
