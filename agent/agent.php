@@ -17,27 +17,58 @@
 
 declare(strict_types=1);
 
-// Configuration
+// Load configuration from config.php if it exists
+$configFile = __DIR__ . '/config.php';
+$fileConfig = [];
+if (file_exists($configFile)) {
+    $fileConfig = include $configFile;
+    if (!is_array($fileConfig)) {
+        fwrite(STDERR, "ERROR: config.php must return an array.\n");
+        exit(1);
+    }
+}
+
+// Base configuration with defaults
 $CONFIG = [
     // Dashboard configuration
-    'dashboard_url' => getenv('DASHBOARD_URL') ?: 'http://localhost:8000',
-    'site_id' => (int)(getenv('SITE_ID') ?: '0'),
-    'agent_token' => getenv('AGENT_TOKEN') ?: '',
+    'dashboard_url' => 'http://localhost:8000',
+    'site_id' => 0,
+    'agent_token' => '',
 
     // BackupPC configuration
-    'backuppc_url' => getenv('BACKUPPC_URL') ?: 'http://localhost/BackupPC',
-    'backuppc_username' => getenv('BACKUPPC_USERNAME') ?: '',
-    'backuppc_password' => getenv('BACKUPPC_PASSWORD') ?: '',
-    'api_key' => getenv('BACKUPPC_API_KEY') ?: '',
+    'backuppc_url' => 'http://localhost/BackupPC',
+    'backuppc_username' => '',
+    'backuppc_password' => '',
+    'api_key' => '',
 
     // Agent configuration
-    'polling_interval' => (int)(getenv('POLLING_INTERVAL') ?: '60'),  // seconds
-    'log_file' => getenv('LOG_FILE') ?: '/var/log/backuppc-monitor-agent.log',
-    'pid_file' => getenv('PID_FILE') ?: '/var/run/backuppc-monitor-agent.pid',
-    'heartbeat_interval' => (int)(getenv('HEARTBEAT_INTERVAL') ?: '300'), // seconds
-    'ws_poll_interval' => (int)(getenv('WS_POLL_INTERVAL') ?: '30'), // seconds for command polling
-    'dashboard_pubkey' => getenv('DASHBOARD_PUBKEY') ?: '', // Optional: dashboard public key for certificate pinning
+    'polling_interval' => 60,   // seconds
+    'log_file' => '/var/log/backuppc-monitor-agent.log',
+    'pid_file' => '/var/run/backuppc-monitor-agent.pid',
+    'heartbeat_interval' => 300, // seconds
+    'ws_poll_interval' => 30,   // seconds for command polling
+    'dashboard_pubkey' => '',   // Optional: dashboard public key for certificate pinning
 ];
+
+// Merge config.php settings (lowest priority)
+if (!empty($fileConfig)) {
+    $CONFIG = array_merge($CONFIG, $fileConfig);
+}
+
+// Override with environment variables (medium priority)
+$CONFIG['dashboard_url'] = getenv('DASHBOARD_URL') ?: $CONFIG['dashboard_url'];
+$CONFIG['site_id'] = (int)(getenv('SITE_ID') ?: $CONFIG['site_id']);
+$CONFIG['agent_token'] = getenv('AGENT_TOKEN') ?: $CONFIG['agent_token'];
+$CONFIG['backuppc_url'] = getenv('BACKUPPC_URL') ?: $CONFIG['backuppc_url'];
+$CONFIG['backuppc_username'] = getenv('BACKUPPC_USERNAME') ?: $CONFIG['backuppc_username'];
+$CONFIG['backuppc_password'] = getenv('BACKUPPC_PASSWORD') ?: $CONFIG['backuppc_password'];
+$CONFIG['api_key'] = getenv('BACKUPPC_API_KEY') ?: $CONFIG['api_key'];
+$CONFIG['polling_interval'] = (int)(getenv('POLLING_INTERVAL') ?: $CONFIG['polling_interval']);
+$CONFIG['log_file'] = getenv('LOG_FILE') ?: $CONFIG['log_file'];
+$CONFIG['pid_file'] = getenv('PID_FILE') ?: $CONFIG['pid_file'];
+$CONFIG['heartbeat_interval'] = (int)(getenv('HEARTBEAT_INTERVAL') ?: $CONFIG['heartbeat_interval']);
+$CONFIG['ws_poll_interval'] = (int)(getenv('WS_POLL_INTERVAL') ?: $CONFIG['ws_poll_interval']);
+$CONFIG['dashboard_pubkey'] = getenv('DASHBOARD_PUBKEY') ?: $CONFIG['dashboard_pubkey'];
 
 // Parse command line arguments
 $OPTIONS = getopt('', [
@@ -75,6 +106,13 @@ Options:
     --interval          Polling interval in seconds (default: 60)
     --log               Path to log file
 
+Configuration:
+    The agent supports multiple configuration methods in order of priority:
+    1. Command line options (highest priority)
+    2. Environment variables
+    3. config.php file (if present)
+    4. Built-in defaults (lowest priority)
+
 Environment Variables:
     SITE_ID             Site ID in the dashboard
     AGENT_TOKEN         Agent authentication token
@@ -85,15 +123,21 @@ Environment Variables:
     BACKUPPC_API_KEY    BackupPC API key
     POLLING_INTERVAL    Polling interval in seconds
     LOG_FILE            Path to log file
+    DASHBOARD_PUBKEY    Optional: dashboard public key for certificate pinning
+
+Configuration File:
+    Copy config.example.php to config.php and modify with your settings.
+    The config.php file should return an array with configuration values.
 
 Example:
     php agent.php --site-id=1 --agent-token=abc123 --dashboard-url=https://monitor.example.com
 
 Installation:
     1. Copy this script to your BackupPC server
-    2. Configure with your dashboard URL and site credentials
-    3. Run as a systemd service or cron job
-    4. See README.md for detailed setup instructions
+    2. Copy config.example.php to config.php and edit settings
+    3. Configure with your dashboard URL and site credentials
+    4. Run as a systemd service or cron job
+    5. See README.md for detailed setup instructions
 
 HELP;
     exit(0);
