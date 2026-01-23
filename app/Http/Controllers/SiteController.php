@@ -335,6 +335,9 @@ class SiteController extends Controller
             if(str_contains($backup->state, 'backup_in_progress')) {
                 $stateDisplay = 'In Progress';
                 $stateClass = 'bg-blue-100 text-blue-800';
+                // Running backups should not be considered failed
+                $status = 'In Progress';
+                $statusClass = 'bg-blue-100 text-blue-800';
             } elseif(str_contains($backup->state, 'idle') && $backup->error_message) {
                 $stateDisplay = 'Failed';
                 $stateClass = 'bg-red-100 text-red-800';
