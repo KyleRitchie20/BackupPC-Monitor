@@ -407,7 +407,8 @@ class SiteController extends Controller
      */
     public function toggleExcludeFromReport(Request $request, Site $site)
     {
-        if (!Auth::user()->isAdmin() && Auth::user()->site_id != $site->id) {
+        $user = Auth::user();
+        if (!$user || (!$user->isAdmin() && $user->site_id != $site->id)) {
             abort(403, 'Unauthorized access.');
         }
 
