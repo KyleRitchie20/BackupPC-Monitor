@@ -184,6 +184,7 @@ class SiteController extends Controller
             abort(403, 'Unauthorized access.');
         }
 
+        // Filter out disabled hosts for the report
         $backupData = $site->backupData()->where('disabled', false)->get();
         $generatedAt = now()->format('Y-m-d H:i:s');
 
@@ -302,7 +303,9 @@ class SiteController extends Controller
             abort(403, 'Unauthorized access.');
         }
 
-        $backupData = $site->backupData()->where('disabled', false)->get();
+        // Show ALL backup data (including disabled) so users can manage exclusions
+        // Only filter out disabled hosts when generating reports
+        $backupData = $site->backupData()->get();
 
         // Process backup data for display
         $processedBackups = [];
