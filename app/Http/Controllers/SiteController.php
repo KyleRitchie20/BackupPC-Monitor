@@ -354,12 +354,44 @@ class SiteController extends Controller
                 'status' => $status,
                 'statusClass' => $statusClass,
                 'updated_at' => $backup->updated_at,
+                'disabled' => $backup->disabled,
             ];
         }
 
         return view('sites.backups', [
             'site' => $site,
             'processedBackups' => collect($processedBackups)
+        ]);
+    }
+
+    /**
+     * Toggle exclude status for a backup host.
+     */
+    public function toggleExcludeHost(Request $request, Site $site)
+    {
+        if (!Auth::user()->isAdmin() && Auth::user()->site_id != $site->id) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $request->validate([
+            'backup_id' => 'required|integer|exists:backup_data,id',
+            'exclude' => 'required|boolean'
+        ]);
+
+        $backup = BackupData::findOrFail($request->backup_id);
+
+        // Ensure the backup belongs to the current site
+        if ($backup->site_id != $site->id) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $backup->disabled = $request->exclude;
+        $backup->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Host exclusion status updated successfully',
+            'disabled' => $backup->disabled
         ]);
     }
 }

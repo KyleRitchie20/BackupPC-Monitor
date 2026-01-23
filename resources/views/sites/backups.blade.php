@@ -37,19 +37,28 @@
                         <div class="overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead class="bg-gray-50 dark:bg-gray-700">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Host Name</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">State</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Full Backup Age</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Incremental Age</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Backup Size</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Updated</th>
-                                    </tr>
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Exclude</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Host Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">State</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Full Backup Age</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Incremental Age</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Backup Size</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Updated</th>
+                                </tr>
                                 </thead>
                                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                     @foreach($processedBackups as $backup)
                                         <tr>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                @if(Auth::user()->isAdmin())
+                                                    <input type="checkbox" class="exclude-checkbox"
+                                                           data-backup-id="{{ $backup['id'] }}"
+                                                           data-site-id="{{ $site->id }}"
+                                                           {{ $backup['disabled'] ?? false ? 'checked' : '' }}>
+                                                @endif
+                                            </td>
                                             <td class="px-6 py-4 whitespace-nowrap font-medium">{{ $backup['host_name'] }}</td>
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <span class="px-2 py-1 rounded text-sm {{ $backup['stateClass'] }}">{{ $backup['stateDisplay'] }}</span>
@@ -79,4 +88,71 @@
             </div>
         </div>
     </div>
+
+    @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                // Add event listeners to all exclude checkboxes
+                document.querySelectorAll('.exclude-checkbox').forEach(function(checkbox) {
+                    checkbox.addEventListener('change', function() {
+                        const backupId = this.getAttribute('data-backup-id');
+                        const siteId = this.getAttribute('data-site-id');
+                        const isExcluded = this.checked;
+
+                        // Show loading state
+                        const originalContent = this.outerHTML;
+                        this.outerHTML = '<div class="loading-spinner">Updating...</div>';
+
+                        // Send AJAX request
+                        fetch(`/sites/${siteId}/backups/toggle-exclude`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                backup_id: backupId,
+                                exclude: isExcluded
+                            })
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (data.success) {
+                                // Update the checkbox state based on server response
+                                const newCheckbox = document.createElement('input');
+                                newCheckbox.type = 'checkbox';
+                                newCheckbox.className = 'exclude-checkbox';
+                                newCheckbox.setAttribute('data-backup-id', backupId);
+                                newCheckbox.setAttribute('data-site-id', siteId);
+                                newCheckbox.checked = data.disabled;
+
+                                // Add event listener to the new checkbox
+                                newCheckbox.addEventListener('change', arguments.callee);
+
+                                // Replace the loading spinner with the updated checkbox
+                                this.parentNode.replaceChild(newCheckbox, this);
+
+                                // Show success message
+                                alert('Host exclusion status updated successfully!');
+                            } else {
+                                throw new Error(data.message || 'Failed to update exclusion status');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            // Restore original checkbox state
+                            this.outerHTML = originalContent;
+                            alert('Error updating host exclusion status: ' + error.message);
+                        });
+                    });
+                });
+            });
+        </script>
+    @endpush
 </x-app-layout>
