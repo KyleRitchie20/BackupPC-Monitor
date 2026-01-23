@@ -172,7 +172,7 @@
                         <h4 class="text-md font-medium mb-2">Recent Backup Activity</h4>
                         <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
                             @php
-                                $allBackups = BackupData::with('site')
+                                $allBackups = App\Models\BackupData::with('site')
                                     ->where('host_name', '!=', 'server')
                                     ->where('host_name', '!=', 'disk_usage')
                                     ->where('host_name', '!=', 'cpool')
