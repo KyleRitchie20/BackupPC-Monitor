@@ -38,7 +38,8 @@
                             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead class="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Exclude</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Disabled</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Exclude from Report</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Host Name</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">State</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Full Backup Age</th>
@@ -53,10 +54,19 @@
                                         <tr>
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 @if(Auth::user()->isAdmin())
-                                                    <input type="checkbox" class="exclude-checkbox"
+                                                    <input type="checkbox"
                                                            data-backup-id="{{ $backup['id'] }}"
                                                            data-site-id="{{ $site->id }}"
-                                                           {{ $backup['disabled'] ?? false ? 'checked' : '' }}>
+                                                           {{ $backup['disabled'] ?? false ? 'checked' : '' }}
+                                                           disabled>
+                                                @endif
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                @if(Auth::user()->isAdmin())
+                                                    <input type="checkbox" class="exclude-from-report-checkbox"
+                                                           data-backup-id="{{ $backup['id'] }}"
+                                                           data-site-id="{{ $site->id }}"
+                                                           {{ $backup['exclude_from_report'] ?? false ? 'checked' : '' }}>
                                                 @endif
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap font-medium">{{ $backup['host_name'] }}</td>
@@ -92,8 +102,8 @@
     @push('scripts')
         <script>
             document.addEventListener('DOMContentLoaded', function() {
-                // Add event listeners to all exclude checkboxes
-                document.querySelectorAll('.exclude-checkbox').forEach(function(checkbox) {
+                // Add event listeners to all "exclude from report" checkboxes
+                document.querySelectorAll('.exclude-from-report-checkbox').forEach(function(checkbox) {
                     checkbox.addEventListener('change', function() {
                         const backupId = this.getAttribute('data-backup-id');
                         const siteId = this.getAttribute('data-site-id');
@@ -104,7 +114,7 @@
                         this.outerHTML = '<div class="loading-spinner">Updating...</div>';
 
                         // Send AJAX request
-                        fetch(`/sites/${siteId}/backups/toggle-exclude`, {
+                        fetch(`/sites/${siteId}/backups/toggle-exclude-from-report`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -113,7 +123,7 @@
                             },
                             body: JSON.stringify({
                                 backup_id: backupId,
-                                exclude: isExcluded
+                                exclude_from_report: isExcluded
                             })
                         })
                         .then(response => {
@@ -127,10 +137,10 @@
                                 // Update the checkbox state based on server response
                                 const newCheckbox = document.createElement('input');
                                 newCheckbox.type = 'checkbox';
-                                newCheckbox.className = 'exclude-checkbox';
+                                newCheckbox.className = 'exclude-from-report-checkbox';
                                 newCheckbox.setAttribute('data-backup-id', backupId);
                                 newCheckbox.setAttribute('data-site-id', siteId);
-                                newCheckbox.checked = data.disabled;
+                                newCheckbox.checked = data.exclude_from_report;
 
                                 // Add event listener to the new checkbox
                                 newCheckbox.addEventListener('change', arguments.callee);
@@ -139,16 +149,16 @@
                                 this.parentNode.replaceChild(newCheckbox, this);
 
                                 // Show success message
-                                alert('Host exclusion status updated successfully!');
+                                alert('Host report exclusion status updated successfully!');
                             } else {
-                                throw new Error(data.message || 'Failed to update exclusion status');
+                                throw new Error(data.message || 'Failed to update report exclusion status');
                             }
                         })
                         .catch(error => {
                             console.error('Error:', error);
                             // Restore original checkbox state
                             this.outerHTML = originalContent;
-                            alert('Error updating host exclusion status: ' + error.message);
+                            alert('Error updating host report exclusion status: ' + error.message);
                         });
                     });
                 });

@@ -19,7 +19,8 @@ class BackupData extends Model
         'incremental_backup_count',
         'error_message',
         'raw_data',
-        'disabled'
+        'disabled',
+        'exclude_from_report'
     ];
 
     protected $casts = [

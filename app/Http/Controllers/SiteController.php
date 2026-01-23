@@ -184,8 +184,8 @@ class SiteController extends Controller
             abort(403, 'Unauthorized access.');
         }
 
-        // Filter out disabled hosts for the report
-        $backupData = $site->backupData()->where('disabled', false)->get();
+        // Filter out hosts excluded from reports
+        $backupData = $site->backupData()->where('exclude_from_report', false)->get();
         $generatedAt = now()->format('Y-m-d H:i:s');
 
         // Process backup data for the report
@@ -358,6 +358,7 @@ class SiteController extends Controller
                 'statusClass' => $statusClass,
                 'updated_at' => $backup->updated_at,
                 'disabled' => $backup->disabled,
+                'exclude_from_report' => $backup->exclude_from_report,
             ];
         }
 
@@ -395,6 +396,37 @@ class SiteController extends Controller
             'success' => true,
             'message' => 'Host exclusion status updated successfully',
             'disabled' => $backup->disabled
+        ]);
+    }
+
+    /**
+     * Toggle exclude from report status for a backup host.
+     */
+    public function toggleExcludeFromReport(Request $request, Site $site)
+    {
+        if (!Auth::user()->isAdmin() && Auth::user()->site_id != $site->id) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $request->validate([
+            'backup_id' => 'required|integer|exists:backup_data,id',
+            'exclude_from_report' => 'required|boolean'
+        ]);
+
+        $backup = BackupData::findOrFail($request->backup_id);
+
+        // Ensure the backup belongs to the current site
+        if ($backup->site_id != $site->id) {
+            abort(403, 'Unauthorized access.');
+        }
+
+        $backup->exclude_from_report = $request->exclude_from_report;
+        $backup->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Host report exclusion status updated successfully',
+            'exclude_from_report' => $backup->exclude_from_report
         ]);
     }
 }
