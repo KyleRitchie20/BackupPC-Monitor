@@ -100,6 +100,42 @@
     </div>
 
     @push('scripts')
+        <style>
+            .loading-spinner {
+                display: inline-block;
+                width: 20px;
+                height: 20px;
+                border: 3px solid rgba(0, 0, 0, 0.1);
+                border-radius: 50%;
+                border-top-color: #3b82f6;
+                animation: spin 1s ease-in-out infinite;
+            }
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+            .success-message {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background-color: #10b981;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                z-index: 1000;
+                animation: slideIn 0.3s ease-out;
+            }
+            @keyframes slideIn {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+        </style>
         <script>
             document.addEventListener('DOMContentLoaded', function() {
                 // Add event listeners to all "exclude from report" checkboxes
@@ -108,10 +144,13 @@
                         const backupId = this.getAttribute('data-backup-id');
                         const siteId = this.getAttribute('data-site-id');
                         const isExcluded = this.checked;
+                        const hostName = this.closest('tr').querySelector('td:nth-child(3)').textContent.trim();
 
-                        // Show loading state
-                        const originalContent = this.outerHTML;
-                        this.outerHTML = '<div class="loading-spinner">Updating...</div>';
+                        // Store reference to the checkbox cell
+                        const checkboxCell = this.parentNode;
+
+                        // Show loading state with host name
+                        checkboxCell.innerHTML = '<div class="loading-spinner" title="Updating..."></div>';
 
                         // Send AJAX request
                         fetch(`/sites/${siteId}/backups/toggle-exclude-from-report`, {
@@ -119,7 +158,8 @@
                             headers: {
                                 'Content-Type': 'application/json',
                                 'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                                'Accept': 'application/json'
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
                             },
                             body: JSON.stringify({
                                 backup_id: backupId,
@@ -128,13 +168,13 @@
                         })
                         .then(response => {
                             if (!response.ok) {
-                                throw new Error('Network response was not ok');
+                                return response.json().then(err => { throw new Error(err.message || 'Network response was not ok'); });
                             }
                             return response.json();
                         })
                         .then(data => {
                             if (data.success) {
-                                // Update the checkbox state based on server response
+                                // Create new checkbox with updated state
                                 const newCheckbox = document.createElement('input');
                                 newCheckbox.type = 'checkbox';
                                 newCheckbox.className = 'exclude-from-report-checkbox';
@@ -146,10 +186,11 @@
                                 newCheckbox.addEventListener('change', arguments.callee);
 
                                 // Replace the loading spinner with the updated checkbox
-                                this.parentNode.replaceChild(newCheckbox, this);
+                                checkboxCell.innerHTML = '';
+                                checkboxCell.appendChild(newCheckbox);
 
                                 // Show success message
-                                alert('Host report exclusion status updated successfully!');
+                                showSuccessMessage(`Host "${hostName}" report exclusion status updated successfully!`);
                             } else {
                                 throw new Error(data.message || 'Failed to update report exclusion status');
                             }
@@ -157,11 +198,64 @@
                         .catch(error => {
                             console.error('Error:', error);
                             // Restore original checkbox state
-                            this.outerHTML = originalContent;
-                            alert('Error updating host report exclusion status: ' + error.message);
+                            const newCheckbox = document.createElement('input');
+                            newCheckbox.type = 'checkbox';
+                            newCheckbox.className = 'exclude-from-report-checkbox';
+                            newCheckbox.setAttribute('data-backup-id', backupId);
+                            newCheckbox.setAttribute('data-site-id', siteId);
+                            newCheckbox.checked = !isExcluded; // Restore original state
+
+                            // Add event listener to the new checkbox
+                            newCheckbox.addEventListener('change', arguments.callee);
+
+                            checkboxCell.innerHTML = '';
+                            checkboxCell.appendChild(newCheckbox);
+
+                            showErrorMessage(`Error updating host "${hostName}" report exclusion status: ${error.message}`);
                         });
                     });
                 });
+
+                // Helper function to show success messages
+                function showSuccessMessage(message) {
+                    const messageElement = document.createElement('div');
+                    messageElement.className = 'success-message';
+                    messageElement.textContent = message;
+
+                    // Remove any existing messages
+                    const existingMessages = document.querySelectorAll('.success-message, .error-message');
+                    existingMessages.forEach(msg => msg.remove());
+
+                    document.body.appendChild(messageElement);
+
+                    // Auto-remove after 5 seconds
+                    setTimeout(() => {
+                        messageElement.style.opacity = '0';
+                        messageElement.style.transform = 'translateX(100%)';
+                        setTimeout(() => messageElement.remove(), 300);
+                    }, 5000);
+                }
+
+                // Helper function to show error messages
+                function showErrorMessage(message) {
+                    const messageElement = document.createElement('div');
+                    messageElement.className = 'success-message';
+                    messageElement.style.backgroundColor = '#ef4444';
+                    messageElement.textContent = message;
+
+                    // Remove any existing messages
+                    const existingMessages = document.querySelectorAll('.success-message, .error-message');
+                    existingMessages.forEach(msg => msg.remove());
+
+                    document.body.appendChild(messageElement);
+
+                    // Auto-remove after 8 seconds
+                    setTimeout(() => {
+                        messageElement.style.opacity = '0';
+                        messageElement.style.transform = 'translateX(100%)';
+                        setTimeout(() => messageElement.remove(), 300);
+                    }, 8000);
+                }
             });
         </script>
     @endpush
