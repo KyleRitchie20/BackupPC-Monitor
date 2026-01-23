@@ -22,24 +22,24 @@
                         </a>
                     </div>
 
-                    @php
-                        $backupService = new BackupPCService();
-                        $totalHosts = 0;
-                        $totalSuccessful = 0;
-                        $totalFailed = 0;
-                        $totalDiskUsage = 0;
-                        $siteCount = $sites->count();
+@php
+    $backupService = new App\Services\BackupPCService();
+    $totalHosts = 0;
+    $totalSuccessful = 0;
+    $totalFailed = 0;
+    $totalDiskUsage = 0;
+    $siteCount = $sites->count();
 
-                        foreach ($sites as $site) {
-                            $summary = $backupService->getBackupStatusSummary($site);
-                            $totalHosts += $summary['total_hosts'];
-                            $totalSuccessful += $summary['successful_backups'];
-                            $totalFailed += $summary['failed_backups'];
-                            $totalDiskUsage += $summary['disk_usage'];
-                        }
+    foreach ($sites as $site) {
+        $summary = $backupService->getBackupStatusSummary($site);
+        $totalHosts += $summary['total_hosts'];
+        $totalSuccessful += $summary['successful_backups'];
+        $totalFailed += $summary['failed_backups'];
+        $totalDiskUsage += $summary['disk_usage'];
+    }
 
-                        $averageDiskUsage = $siteCount > 0 ? round($totalDiskUsage / $siteCount) : 0;
-                    @endphp
+    $averageDiskUsage = $siteCount > 0 ? round($totalDiskUsage / $siteCount) : 0;
+@endphp
 
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                         <!-- Total Sites -->
