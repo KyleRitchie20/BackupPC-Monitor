@@ -54,8 +54,16 @@ Route::middleware('auth')->group(function () {
     Route::post('/fetch-backup-data', [\App\Http\Controllers\DashboardController::class, 'fetchBackupData'])->name('fetch.backup.data');
     Route::post('/fetch-all-backup-data', [\App\Http\Controllers\DashboardController::class, 'fetchAllBackupData'])->name('fetch.all.backup.data');
     Route::get('/get-backup-status', [\App\Http\Controllers\DashboardController::class, 'getBackupStatus'])->name('get.backup.status');
-    Route::get('/reports', [\App\Http\Controllers\DashboardController::class, 'reports'])->name('reports.index')->middleware('admin');
-    Route::get('/download-report', [\App\Http\Controllers\DashboardController::class, 'downloadReport'])->name('download.report')->middleware('admin');
+    // Reporting routes (interactive hub, date-filtered PDF/CSV, email, schedules)
+    Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/download-pdf', [\App\Http\Controllers\ReportController::class, 'downloadPdf'])->name('reports.download-pdf');
+    Route::get('/reports/export-csv', [\App\Http\Controllers\ReportController::class, 'exportCsv'])->name('reports.export-csv');
+    Route::post('/reports/email', [\App\Http\Controllers\ReportController::class, 'emailReport'])->name('reports.email');
+    Route::post('/reports/schedules', [\App\Http\Controllers\ReportController::class, 'storeSchedule'])->name('reports.schedules.store')->middleware('admin');
+    Route::post('/reports/schedules/{schedule}/run-now', [\App\Http\Controllers\ReportController::class, 'runScheduleNow'])->name('reports.schedules.run-now')->middleware('admin');
+    Route::post('/reports/schedules/{schedule}/toggle', [\App\Http\Controllers\ReportController::class, 'toggleSchedule'])->name('reports.schedules.toggle')->middleware('admin');
+    Route::delete('/reports/schedules/{schedule}', [\App\Http\Controllers\ReportController::class, 'destroySchedule'])->name('reports.schedules.destroy')->middleware('admin');
+    Route::get('/download-report', [\App\Http\Controllers\ReportController::class, 'downloadPdf'])->name('download.report');
 });
 
 // Agent communication routes (no authentication required for agents)

@@ -6,6 +6,7 @@ use App\Events\AgentCommandEvent;
 use App\Events\BackupDataUpdated;
 use App\Events\BackupStatusChanged;
 use App\Models\Site;
+use App\Services\BackupPCService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
@@ -160,60 +161,7 @@ class AgentController extends Controller
      */
     protected function storeBackupData(Site $site, array $data)
     {
-        $backupDataModel = \App\Models\BackupData::class;
-
-        // Clear old data for this site
-        $backupDataModel::where('site_id', $site->id)->delete();
-
-        // Store server data
-        if (isset($data['server'])) {
-            $backupDataModel::create([
-                'site_id' => $site->id,
-                'host_name' => 'server',
-                'state' => 'server',
-                'last_backup_time' => now(),
-                'raw_data' => $data['server'],
-            ]);
-        }
-
-        // Store host data
-        if (isset($data['hosts']) && is_array($data['hosts'])) {
-            foreach ($data['hosts'] as $hostName => $hostData) {
-                $backupDataModel::create([
-                    'site_id' => $site->id,
-                    'host_name' => $hostName,
-                    'state' => $hostData['state'] ?? 'unknown',
-                    'last_backup_time' => isset($hostData['full_age']) && $hostData['full_age'] > 0
-                        ? date('Y-m-d H:i:s', $hostData['full_age'])
-                        : null,
-                    'last_backup_size' => $hostData['full_size'] ?? null,
-                    'full_backup_count' => $hostData['full_count'] ?? 0,
-                    'incremental_backup_count' => $hostData['incr_count'] ?? 0,
-                    'error_message' => $hostData['error'] ?? null,
-                    'disabled' => $hostData['disabled'] ?? 0,
-                    'raw_data' => $hostData,
-                ]);
-            }
-        }
-
-        // Store disk and pool data
-        if (isset($data['disk'])) {
-            $backupDataModel::create([
-                'site_id' => $site->id,
-                'host_name' => 'disk_usage',
-                'state' => 'disk',
-                'raw_data' => $data['disk'],
-            ]);
-        }
-
-        if (isset($data['cpool'])) {
-            $backupDataModel::create([
-                'site_id' => $site->id,
-                'host_name' => 'cpool',
-                'state' => 'pool',
-                'raw_data' => $data['cpool'],
-            ]);
-        }
+        app(BackupPCService::class)->storeBackupData($site, $data);
     }
 
     /**

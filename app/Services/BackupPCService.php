@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Site;
 use App\Models\BackupData;
+use App\Models\BackupRun;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Crypt;
@@ -216,60 +218,151 @@ class BackupPCService
     }
 
     /**
-     * Store backup data in database
+     * Store backup data in database (upserts state and tracks historical runs)
      */
-    protected function storeBackupData(Site $site, array $data)
+    public function storeBackupData(Site $site, array $data)
     {
-        // Clear old data for this site
-        BackupData::where('site_id', $site->id)->delete();
-
-        // Store server data
+        // 1. Store/update server data
         if (isset($data['server'])) {
-            BackupData::create([
-                'site_id' => $site->id,
-                'host_name' => 'server',
-                'state' => 'server',
-                'last_backup_time' => now(),
-                'raw_data' => $data['server']
-            ]);
+            BackupData::updateOrCreate(
+                ['site_id' => $site->id, 'host_name' => 'server'],
+                [
+                    'state' => 'server',
+                    'last_backup_time' => now(),
+                    'raw_data' => $data['server']
+                ]
+            );
         }
 
-        // Store host data
+        // 2. Store/update host data and record historical runs
         if (isset($data['hosts']) && is_array($data['hosts'])) {
             foreach ($data['hosts'] as $hostName => $hostData) {
-                BackupData::create([
-                    'site_id' => $site->id,
-                    'host_name' => $hostName,
-                    'state' => $hostData['state'] ?? 'unknown',
-                    'last_backup_time' => isset($hostData['full_age']) && $hostData['full_age'] > 0 ? date('Y-m-d H:i:s', $hostData['full_age']) : null,
-                    'last_backup_size' => $hostData['full_size'] ?? null,
-                    'full_backup_count' => $hostData['full_count'] ?? 0,
-                    'incremental_backup_count' => $hostData['incr_count'] ?? 0,
-                    'error_message' => $hostData['error'] ?? null,
-                    'disabled' => $hostData['disabled'] ?? 0,
-                    'raw_data' => $hostData
-                ]);
+                // Preserve user-configured settings if host already exists
+                $existing = BackupData::where('site_id', $site->id)
+                    ->where('host_name', $hostName)
+                    ->first();
+
+                $excludeFromReport = $existing ? (bool)$existing->exclude_from_report : false;
+                $disabled = $existing ? (int)$existing->disabled : ($hostData['disabled'] ?? 0);
+                if (isset($hostData['disabled'])) {
+                    $disabled = (int)$hostData['disabled'];
+                }
+
+                $fullAge = isset($hostData['full_age']) && $hostData['full_age'] > 0 ? (int)$hostData['full_age'] : null;
+                $incrAge = isset($hostData['incr_age']) && $hostData['incr_age'] > 0 ? (int)$hostData['incr_age'] : null;
+
+                $lastBackupTime = $fullAge ? date('Y-m-d H:i:s', $fullAge) : null;
+                if ($incrAge && (!$fullAge || $incrAge > $fullAge)) {
+                    $lastBackupTime = date('Y-m-d H:i:s', $incrAge);
+                }
+
+                BackupData::updateOrCreate(
+                    ['site_id' => $site->id, 'host_name' => $hostName],
+                    [
+                        'state' => $hostData['state'] ?? 'unknown',
+                        'last_backup_time' => $lastBackupTime,
+                        'last_backup_size' => $hostData['full_size'] ?? null,
+                        'full_backup_count' => $hostData['full_count'] ?? 0,
+                        'incremental_backup_count' => $hostData['incr_count'] ?? 0,
+                        'error_message' => $hostData['error'] ?? null,
+                        'disabled' => $disabled,
+                        'exclude_from_report' => $excludeFromReport,
+                        'raw_data' => $hostData
+                    ]
+                );
+
+                // --- RECORD HISTORICAL BACKUP RUNS ---
+                // Full backup run
+                if ($fullAge) {
+                    $fullCompletedAt = Carbon::createFromTimestamp($fullAge);
+                    $fullDuration = isset($hostData['full_dur']) && $hostData['full_dur'] > 0 ? (int)$hostData['full_dur'] : null;
+                    $fullStartedAt = ($fullDuration && $fullCompletedAt) ? $fullCompletedAt->copy()->subSeconds($fullDuration) : null;
+                    $fullStatus = !empty($hostData['error']) ? 'warning' : 'success';
+
+                    BackupRun::updateOrCreate(
+                        [
+                            'site_id' => $site->id,
+                            'host_name' => $hostName,
+                            'type' => 'full',
+                            'completed_at' => $fullCompletedAt,
+                        ],
+                        [
+                            'started_at' => $fullStartedAt,
+                            'duration_seconds' => $fullDuration,
+                            'backup_size' => $hostData['full_size'] ?? null,
+                            'error_message' => $hostData['error'] ?? null,
+                            'status' => $fullStatus,
+                            'raw_data' => $hostData,
+                        ]
+                    );
+                }
+
+                // Incremental backup run
+                if ($incrAge) {
+                    $incrCompletedAt = Carbon::createFromTimestamp($incrAge);
+                    BackupRun::updateOrCreate(
+                        [
+                            'site_id' => $site->id,
+                            'host_name' => $hostName,
+                            'type' => 'incremental',
+                            'completed_at' => $incrCompletedAt,
+                        ],
+                        [
+                            'status' => 'success',
+                            'raw_data' => $hostData,
+                        ]
+                    );
+                }
+
+                // Record backups list if detailed array is present
+                if (isset($hostData['backups']) && is_array($hostData['backups'])) {
+                    foreach ($hostData['backups'] as $b) {
+                        $bTime = $b['endTime'] ?? $b['startTime'] ?? null;
+                        if (!$bTime) continue;
+                        $bCompleted = is_numeric($bTime) ? Carbon::createFromTimestamp($bTime) : Carbon::parse($bTime);
+                        $bType = (isset($b['type']) && strtolower($b['type']) === 'full') ? 'full' : 'incremental';
+                        $bStarted = isset($b['startTime']) ? (is_numeric($b['startTime']) ? Carbon::createFromTimestamp($b['startTime']) : Carbon::parse($b['startTime'])) : null;
+                        $bDuration = ($bStarted && $bCompleted) ? $bCompleted->diffInSeconds($bStarted) : null;
+
+                        BackupRun::updateOrCreate(
+                            [
+                                'site_id' => $site->id,
+                                'host_name' => $hostName,
+                                'type' => $bType,
+                                'completed_at' => $bCompleted,
+                            ],
+                            [
+                                'backup_num' => $b['num'] ?? null,
+                                'started_at' => $bStarted,
+                                'duration_seconds' => $bDuration,
+                                'backup_size' => $b['size'] ?? null,
+                                'error_count' => $b['errorCnt'] ?? 0,
+                                'error_message' => $b['error'] ?? null,
+                                'status' => (!empty($b['errorCnt']) && $b['errorCnt'] > 0) ? 'warning' : 'success',
+                                'raw_data' => $b,
+                            ]
+                        );
+                    }
+                }
             }
         }
 
-        // Store disk and pool data
+        // 3. Store disk and pool data
         if (isset($data['disk'])) {
-            BackupData::create([
-                'site_id' => $site->id,
-                'host_name' => 'disk_usage',
-                'state' => 'disk',
-                'raw_data' => $data['disk']
-            ]);
+            BackupData::updateOrCreate(
+                ['site_id' => $site->id, 'host_name' => 'disk_usage'],
+                ['state' => 'disk', 'raw_data' => $data['disk']]
+            );
         }
 
         if (isset($data['cpool'])) {
-            BackupData::create([
-                'site_id' => $site->id,
-                'host_name' => 'cpool',
-                'state' => 'pool',
-                'raw_data' => $data['cpool']
-            ]);
+            BackupData::updateOrCreate(
+                ['site_id' => $site->id, 'host_name' => 'cpool'],
+                ['state' => 'pool', 'raw_data' => $data['cpool']]
+            );
         }
+
+        $site->updateAgentContact();
     }
 
     /**

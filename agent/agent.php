@@ -17,6 +17,22 @@
 
 declare(strict_types=1);
 
+// Check for required PHP extensions
+$requiredExtensions = ['json', 'curl'];
+$missingExtensions = [];
+foreach ($requiredExtensions as $ext) {
+    if (!extension_loaded($ext)) {
+        $missingExtensions[] = $ext;
+    }
+}
+if (!empty($missingExtensions)) {
+    fwrite(STDERR, "ERROR: Required PHP extensions are missing: " . implode(', ', $missingExtensions) . "\n");
+    fwrite(STDERR, "Please install them. For example:\n");
+    fwrite(STDERR, "  CentOS/RHEL: sudo yum install php-json php-curl\n");
+    fwrite(STDERR, "  Ubuntu/Debian: sudo apt-get install php-json php-curl\n");
+    exit(1);
+}
+
 // Load configuration from config.php if it exists
 $configFile = __DIR__ . '/config.php';
 $fileConfig = [];
@@ -199,15 +215,17 @@ if (strlen($CONFIG['pid_file']) > 255) {
  */
 class AgentLogger
 {
-    private string $logFile;
-    private bool $initialized = false;
+    /** @var string */
+    private $logFile;
+    /** @var bool */
+    private $initialized = false;
 
-    public function __construct(string $logFile)
+    public function __construct($logFile)
     {
         $this->logFile = $logFile;
     }
 
-    private function init(): void
+    private function init()
     {
         if ($this->initialized) return;
 
@@ -222,13 +240,13 @@ class AgentLogger
     /**
      * Filter sensitive data from log messages
      */
-    private function filterSensitiveData(string $message, array $context = []): array
+    private function filterSensitiveData($message, array $context = [])
     {
         $sensitiveKeys = ['agent_token', 'password', 'api_key', 'token'];
 
         // Filter message
         foreach ($sensitiveKeys as $key) {
-            if (str_contains($message, $key)) {
+            if (strpos($message, $key) !== false) {
                 $message = preg_replace('/' . $key . '.*?(\s|$)/i', $key . ': ***REDACTED***$1', $message);
             }
         }
@@ -246,7 +264,7 @@ class AgentLogger
         return [$message, $filteredContext];
     }
 
-    public function log(string $level, string $message, array $context = []): void
+    public function log($level, $message, array $context = [])
     {
         $this->init();
 
@@ -267,10 +285,10 @@ class AgentLogger
         }
     }
 
-    public function info(string $message, array $context = []): void { $this->log('INFO', $message, $context); }
-    public function error(string $message, array $context = []): void { $this->log('ERROR', $message, $context); }
-    public function warning(string $message, array $context = []): void { $this->log('WARNING', $message, $context); }
-    public function debug(string $message, array $context = []): void { $this->log('DEBUG', $message, $context); }
+    public function info($message, array $context = []) { $this->log('INFO', $message, $context); }
+    public function error($message, array $context = []) { $this->log('ERROR', $message, $context); }
+    public function warning($message, array $context = []) { $this->log('WARNING', $message, $context); }
+    public function debug($message, array $context = []) { $this->log('DEBUG', $message, $context); }
 }
 
 /**
@@ -278,11 +296,16 @@ class AgentLogger
  */
 class BackupPCClient
 {
-    private string $baseUrl;
-    private ?string $username;
-    private ?string $password;
-    private ?string $apiKey;
-    private AgentLogger $logger;
+    /** @var string */
+    private $baseUrl;
+    /** @var string|null */
+    private $username;
+    /** @var string|null */
+    private $password;
+    /** @var string|null */
+    private $apiKey;
+    /** @var AgentLogger */
+    private $logger;
 
     public function __construct(array $config, AgentLogger $logger)
     {
@@ -296,7 +319,7 @@ class BackupPCClient
     /**
      * Fetch metrics from BackupPC
      */
-    public function fetchMetrics(): ?array
+    public function fetchMetrics()
     {
         $url = rtrim($this->baseUrl, '/') . '/BackupPC_Admin?action=metrics&format=json';
 
@@ -403,7 +426,7 @@ class BackupPCClient
     /**
      * Get current host status for change detection
      */
-    public function getHostStatus(): array
+    public function getHostStatus()
     {
         $metrics = $this->fetchMetrics();
         if (!$metrics || !isset($metrics['hosts'])) {
@@ -423,10 +446,14 @@ class BackupPCClient
  */
 class DashboardClient
 {
-    private string $dashboardUrl;
-    private int $siteId;
-    private string $agentToken;
-    private AgentLogger $logger;
+    /** @var string */
+    private $dashboardUrl;
+    /** @var int */
+    private $siteId;
+    /** @var string */
+    private $agentToken;
+    /** @var AgentLogger */
+    private $logger;
 
     public function __construct(array $config, AgentLogger $logger)
     {
@@ -439,7 +466,7 @@ class DashboardClient
     /**
      * Register this agent with the dashboard
      */
-    public function register(string $version, string $hostname): bool
+    public function register($version, $hostname)
     {
         $url = "{$this->dashboardUrl}/api/agent/register";
 
@@ -466,7 +493,7 @@ class DashboardClient
     /**
      * Send backup data to dashboard
      */
-    public function sendData(array $backupData, string $eventType = 'full_update'): bool
+    public function sendData(array $backupData, $eventType = 'full_update')
     {
         $url = "{$this->dashboardUrl}/api/agent/data";
 
@@ -491,7 +518,7 @@ class DashboardClient
     /**
      * Send heartbeat to dashboard
      */
-    public function sendHeartbeat(): bool
+    public function sendHeartbeat()
     {
         return $this->sendData(['type' => 'heartbeat', 'timestamp' => date('c')], 'heartbeat');
     }
@@ -499,7 +526,7 @@ class DashboardClient
     /**
      * Get site configuration from dashboard
      */
-    public function getSiteConfig(): ?array
+    public function getSiteConfig()
     {
         $url = "{$this->dashboardUrl}/api/agent/config";
 
@@ -514,7 +541,7 @@ class DashboardClient
     /**
      * Validate URL format and enforce HTTPS for dashboard URLs
      */
-    private function validateUrl(string $url, bool $requireHttps = false): bool
+    private function validateUrl($url, $requireHttps = false)
     {
         if (!filter_var($url, FILTER_VALIDATE_URL)) {
             return false;
@@ -543,8 +570,9 @@ class DashboardClient
 
     /**
      * Initialize cURL handle with secure defaults for dashboard communication
+     * @return resource
      */
-    public function curlInit(string $url): \CurlHandle
+    public function curlInit($url)
     {
         if (!$this->validateUrl($url, true)) {  // Require HTTPS for dashboard URLs
             throw new \Exception("Invalid dashboard URL: {$url}");
@@ -583,7 +611,7 @@ class DashboardClient
     /**
      * Make POST request to dashboard
      */
-    private function post(string $url, array $data): ?array
+    private function post($url, array $data)
     {
         if (!$this->validateUrl($url, true)) {  // Require HTTPS for dashboard URLs
             $this->logger->error("Invalid dashboard URL provided: {$url}");
@@ -641,14 +669,22 @@ class DashboardClient
  */
 class BackupPCAgent
 {
-    private array $config;
-    private AgentLogger $logger;
-    private BackupPCClient $backuppc;
-    private DashboardClient $dashboard;
-    private array $previousHostStatus = [];
-    private bool $running = true;
-    private int $heartbeatCounter = 0;
-    private array $commandTimestamps = []; // For rate limiting
+    /** @var array */
+    private $config;
+    /** @var AgentLogger */
+    private $logger;
+    /** @var BackupPCClient */
+    private $backuppc;
+    /** @var DashboardClient */
+    private $dashboard;
+    /** @var array */
+    private $previousHostStatus = [];
+    /** @var bool */
+    private $running = true;
+    /** @var int */
+    private $heartbeatCounter = 0;
+    /** @var array */
+    private $commandTimestamps = []; // For rate limiting
 
     public function __construct(array $config)
     {
@@ -661,7 +697,7 @@ class BackupPCAgent
     /**
      * Run the agent
      */
-    public function run(): void
+    public function run()
     {
         $this->logger->info("Starting BackupPC Monitor Agent", [
             'site_id' => $this->config['site_id'],
@@ -761,7 +797,7 @@ class BackupPCAgent
     /**
      * Poll for commands from the dashboard
      */
-    private function pollForCommands(): void
+    private function pollForCommands()
     {
         $this->logger->debug("Polling for commands from dashboard");
 
@@ -803,12 +839,12 @@ class BackupPCAgent
     /**
      * Check if command rate limit is exceeded
      */
-    private function checkRateLimit(): bool
+    private function checkRateLimit()
     {
         $now = time();
         // Keep only commands from the last minute
         $this->commandTimestamps = array_filter($this->commandTimestamps,
-            fn($ts) => $ts > $now - 60);
+            function($ts) use ($now) { return $ts > $now - 60; });
 
         // Allow maximum 10 commands per minute
         if (count($this->commandTimestamps) >= 10) {
@@ -823,7 +859,7 @@ class BackupPCAgent
     /**
      * Handle a command received from the dashboard
      */
-    private function handleCommand(array $command): void
+    private function handleCommand(array $command)
     {
         // Check rate limiting first
         if (!$this->checkRateLimit()) {
@@ -871,7 +907,7 @@ class BackupPCAgent
     /**
      * Acknowledge a command was executed
      */
-    private function acknowledgeCommand(string $commandId): void
+    private function acknowledgeCommand($commandId)
     {
         $url = rtrim($this->config['dashboard_url'], '/') . '/api/agent/command/ack';
         $data = [
@@ -898,7 +934,7 @@ class BackupPCAgent
     /**
      * Fetch data from BackupPC and send to dashboard
      */
-    private function fetchAndSend(): void
+    private function fetchAndSend()
     {
         $this->logger->info("Fetching backup data from BackupPC");
 
@@ -943,7 +979,7 @@ class BackupPCAgent
     /**
      * Stop the agent gracefully
      */
-    public function stop(): void
+    public function stop()
     {
         $this->running = false;
         $this->logger->info("Stopping agent...");
@@ -952,7 +988,7 @@ class BackupPCAgent
     /**
      * Write PID file
      */
-    public function writePidFile(): bool
+    public function writePidFile()
     {
         $pid = getmypid();
         $dir = dirname($this->config['pid_file']);
@@ -972,7 +1008,7 @@ class BackupPCAgent
     /**
      * Clean up PID file
      */
-    public function cleanupPidFile(): void
+    public function cleanupPidFile()
     {
         if (file_exists($this->config['pid_file'])) {
             @unlink($this->config['pid_file']);
@@ -984,7 +1020,7 @@ class BackupPCAgent
 $GLOBALS['shutdown_requested'] = false;
 
 // Signal handlers for graceful shutdown
-function signalHandler(int $signal): void
+function signalHandler($signal)
 {
     $GLOBALS['shutdown_requested'] = true;
     fwrite(STDERR, "\nReceived signal {$signal}, shutting down gracefully...\n");

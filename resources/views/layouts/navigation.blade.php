@@ -31,12 +31,12 @@
                     <x-nav-link :href="route('client-users.index')" :active="request()->routeIs('client-users.*')">
                         {{ __('Clients') }}
                     </x-nav-link>
+                    @endif
                     
                     <!-- Reports -->
                     <x-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.*')">
                         {{ __('Reports') }}
                     </x-nav-link>
-                    @endif
                 </div>
             </div>
 
@@ -123,10 +123,11 @@
             <x-responsive-nav-link :href="route('client-users.create')" :active="request()->routeIs('client-users.create')">
                 {{ __('Add Client') }}
             </x-responsive-nav-link>
+            @endif
+
             <x-responsive-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.*')">
                 {{ __('Reports') }}
             </x-responsive-nav-link>
-            @endif
         </div>
 
         <!-- Responsive Settings Options -->

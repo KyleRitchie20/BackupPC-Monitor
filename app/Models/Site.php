@@ -78,4 +78,14 @@ class Site extends Model
     {
         return $this->hasMany(BackupData::class);
     }
+
+    public function backupRuns()
+    {
+        return $this->hasMany(BackupRun::class);
+    }
+
+    public function reportSchedules()
+    {
+        return $this->hasMany(ReportSchedule::class);
+    }
 }
