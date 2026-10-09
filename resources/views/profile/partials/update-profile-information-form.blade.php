@@ -1,10 +1,10 @@
 <section>
     <header>
-        <h2 class="text-lg font-medium text-gray-900">
+        <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
             {{ __('Profile Information') }}
         </h2>
 
-        <p class="mt-1 text-sm text-gray-600">
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
             {{ __("Update your account's profile information and email address.") }}
         </p>
     </header>
@@ -30,10 +30,10 @@
 
             @if ($user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail())
                 <div>
-                    <p class="text-sm mt-2 text-gray-800">
+                    <p class="text-sm mt-2 text-gray-800 dark:text-gray-200">
                         {{ __('Your email address is unverified.') }}
 
-                        <button form="send-verification" class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        <button form="send-verification" class="underline text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                             {{ __('Click here to re-send the verification email.') }}
                         </button>
                     </p>
@@ -56,7 +56,7 @@
                     x-show="show"
                     x-transition
                     x-init="setTimeout(() => show = false, 2000)"
-                    class="text-sm text-gray-600"
+                    class="text-sm text-gray-600 dark:text-gray-400"
                 >{{ __('Saved.') }}</p>
             @endif
         </div>
@@ -65,11 +65,11 @@
 
 <section>
     <header>
-        <h2 class="text-lg font-medium text-gray-900">
+        <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
             {{ __('Report Scheduling') }}
         </h2>
 
-        <p class="mt-1 text-sm text-gray-600">
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
             {{ __("Configure when you want to receive backup reports.") }}
         </p>
     </header>
@@ -80,7 +80,7 @@
 
         <div>
             <x-input-label for="report_frequency" :value="__('Report Frequency')" />
-            <select id="report_frequency" name="report_frequency" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md">
+            <select id="report_frequency" name="report_frequency" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm">
                 <option value="">{{ __('No reports') }}</option>
                 <option value="daily" {{ old('report_frequency', $user->report_frequency) === 'daily' ? 'selected' : '' }}>{{ __('Daily') }}</option>
                 <option value="weekly" {{ old('report_frequency', $user->report_frequency) === 'weekly' ? 'selected' : '' }}>{{ __('Weekly') }}</option>
@@ -94,24 +94,24 @@
             <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
                 @php $selectedDays = old('report_days', $user->report_days ?? []); @endphp
                 <label class="flex items-center">
-                    <input type="checkbox" name="report_days[]" value="monday" {{ in_array('monday', $selectedDays) ? 'checked' : '' }} class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
-                    <span class="ml-2 text-sm">{{ __('Monday') }}</span>
+                    <input type="checkbox" name="report_days[]" value="monday" {{ in_array('monday', $selectedDays) ? 'checked' : '' }} class="rounded border-gray-300 dark:border-gray-700 dark:bg-gray-900 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:focus:ring-offset-gray-800">
+                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ __('Monday') }}</span>
                 </label>
                 <label class="flex items-center">
-                    <input type="checkbox" name="report_days[]" value="tuesday" {{ in_array('tuesday', $selectedDays) ? 'checked' : '' }} class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
-                    <span class="ml-2 text-sm">{{ __('Tuesday') }}</span>
+                    <input type="checkbox" name="report_days[]" value="tuesday" {{ in_array('tuesday', $selectedDays) ? 'checked' : '' }} class="rounded border-gray-300 dark:border-gray-700 dark:bg-gray-900 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:focus:ring-offset-gray-800">
+                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ __('Tuesday') }}</span>
                 </label>
                 <label class="flex items-center">
-                    <input type="checkbox" name="report_days[]" value="wednesday" {{ in_array('wednesday', $selectedDays) ? 'checked' : '' }} class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
-                    <span class="ml-2 text-sm">{{ __('Wednesday') }}</span>
+                    <input type="checkbox" name="report_days[]" value="wednesday" {{ in_array('wednesday', $selectedDays) ? 'checked' : '' }} class="rounded border-gray-300 dark:border-gray-700 dark:bg-gray-900 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:focus:ring-offset-gray-800">
+                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ __('Wednesday') }}</span>
                 </label>
                 <label class="flex items-center">
-                    <input type="checkbox" name="report_days[]" value="thursday" {{ in_array('thursday', $selectedDays) ? 'checked' : '' }} class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
-                    <span class="ml-2 text-sm">{{ __('Thursday') }}</span>
+                    <input type="checkbox" name="report_days[]" value="thursday" {{ in_array('thursday', $selectedDays) ? 'checked' : '' }} class="rounded border-gray-300 dark:border-gray-700 dark:bg-gray-900 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:focus:ring-offset-gray-800">
+                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ __('Thursday') }}</span>
                 </label>
                 <label class="flex items-center">
-                    <input type="checkbox" name="report_days[]" value="friday" {{ in_array('friday', $selectedDays) ? 'checked' : '' }} class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
-                    <span class="ml-2 text-sm">{{ __('Friday') }}</span>
+                    <input type="checkbox" name="report_days[]" value="friday" {{ in_array('friday', $selectedDays) ? 'checked' : '' }} class="rounded border-gray-300 dark:border-gray-700 dark:bg-gray-900 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:focus:ring-offset-gray-800">
+                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">{{ __('Friday') }}</span>
                 </label>
             </div>
             <x-input-error class="mt-2" :messages="$errors->get('report_days')" />
@@ -119,7 +119,7 @@
 
         <div id="weekly-options" class="space-y-2" style="{{ old('report_frequency', $user->report_frequency) === 'weekly' ? '' : 'display: none;' }}">
             <x-input-label :value="__('Select day for weekly report')" />
-            <select name="report_days[]" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md">
+            <select name="report_days[]" class="mt-1 block w-full border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 rounded-md shadow-sm">
                 <option value="">{{ __('Select a day') }}</option>
                 @php $selectedDay = is_array(old('report_days', $user->report_days)) ? (old('report_days', $user->report_days)[0] ?? '') : old('report_days', $user->report_days); @endphp
                 <option value="monday" {{ $selectedDay === 'monday' ? 'selected' : '' }}>{{ __('Monday') }}</option>
@@ -133,7 +133,7 @@
             <x-input-error class="mt-2" :messages="$errors->get('report_days')" />
         </div>
 
-        <div id="monthly-options" class="text-sm text-gray-600" style="{{ old('report_frequency', $user->report_frequency) === 'monthly' ? '' : 'display: none;' }}">
+        <div id="monthly-options" class="text-sm text-gray-600 dark:text-gray-400" style="{{ old('report_frequency', $user->report_frequency) === 'monthly' ? '' : 'display: none;' }}">
             {{ __('Monthly reports will be sent on the 1st of each month.') }}
         </div>
 
@@ -146,7 +146,7 @@
                     x-show="show"
                     x-transition
                     x-init="setTimeout(() => show = false, 2000)"
-                    class="text-sm text-gray-600"
+                    class="text-sm text-gray-600 dark:text-gray-400"
                 >{{ __('Saved.') }}</p>
             @endif
         </div>

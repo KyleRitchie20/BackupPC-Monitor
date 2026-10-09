@@ -104,7 +104,7 @@
 
                         <div class="mt-6">
                             <x-input-label for="is_active" :value="__('Active Status')" />
-                            <input id="is_active" type="checkbox" name="is_active" value="1" checked class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+                            <input id="is_active" type="checkbox" name="is_active" value="1" checked class="rounded border-gray-300 dark:border-gray-700 dark:bg-gray-900 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:focus:ring-offset-gray-800">
                         </div>
 
                         <div class="flex items-center justify-end mt-6">

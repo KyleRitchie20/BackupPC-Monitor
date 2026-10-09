@@ -314,36 +314,36 @@ class SiteController extends Controller
             $incrementalAge = $this->calculateIncrementalAge($backup);
 
             // Determine status classes
-            $fullBackupAgeClass = $fullBackupAge > 14 ? 'text-red-600' : ($fullBackupAge > 7 ? 'text-yellow-600' : 'text-green-600');
-            $incrementalAgeClass = $incrementalAge > 7 ? 'text-red-600' : ($incrementalAge > 3 ? 'text-yellow-600' : 'text-green-600');
+            $fullBackupAgeClass = $fullBackupAge > 14 ? 'text-red-600 dark:text-red-400 font-medium' : ($fullBackupAge > 7 ? 'text-yellow-600 dark:text-yellow-400 font-medium' : 'text-green-600 dark:text-green-400 font-medium');
+            $incrementalAgeClass = $incrementalAge > 7 ? 'text-red-600 dark:text-red-400 font-medium' : ($incrementalAge > 3 ? 'text-yellow-600 dark:text-yellow-400 font-medium' : 'text-green-600 dark:text-green-400 font-medium');
 
             // Determine overall status
             $status = 'Healthy';
-            $statusClass = 'bg-green-100 text-green-800';
+            $statusClass = 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300';
 
             if ($fullBackupAge > 14 || $incrementalAge > 7) {
                 $status = 'Critical';
-                $statusClass = 'bg-red-100 text-red-800';
+                $statusClass = 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300';
             } elseif ($fullBackupAge > 7 || $incrementalAge > 3) {
                 $status = 'Warning';
-                $statusClass = 'bg-yellow-100 text-yellow-800';
+                $statusClass = 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300';
             }
 
             // Determine state display
             $stateDisplay = $backup->state;
-            $stateClass = 'bg-gray-100 text-gray-800';
+            $stateClass = 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
             if(str_contains($backup->state, 'backup_in_progress')) {
                 $stateDisplay = 'In Progress';
-                $stateClass = 'bg-blue-100 text-blue-800';
+                $stateClass = 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300';
                 // Running backups should not be considered failed
                 $status = 'In Progress';
-                $statusClass = 'bg-blue-100 text-blue-800';
+                $statusClass = 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300';
             } elseif(str_contains($backup->state, 'idle') && $backup->error_message) {
                 $stateDisplay = 'Failed';
-                $stateClass = 'bg-red-100 text-red-800';
+                $stateClass = 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300';
             } elseif(str_contains($backup->state, 'idle')) {
                 $stateDisplay = 'Idle';
-                $stateClass = 'bg-green-100 text-green-800';
+                $stateClass = 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300';
             }
 
             $processedBackups[] = [

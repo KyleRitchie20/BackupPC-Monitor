@@ -105,11 +105,11 @@
 
                         <div class="mt-6">
                             <x-input-label for="is_active" :value="__('Active Status')" />
-                            <input id="is_active" type="checkbox" name="is_active" value="1" {{ old('is_active', $site->is_active) ? 'checked' : '' }} class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+                            <input id="is_active" type="checkbox" name="is_active" value="1" {{ old('is_active', $site->is_active) ? 'checked' : '' }} class="rounded border-gray-300 dark:border-gray-700 dark:bg-gray-900 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:focus:ring-offset-gray-800">
                         </div>
 
                         <div class="flex items-center justify-end mt-6">
-                            <a href="{{ route('sites.index') }}" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">
+                            <a href="{{ route('sites.index') }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600">
                                 {{ __('Cancel') }}
                             </a>
                             <x-primary-button class="ml-3">

@@ -10,7 +10,7 @@
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 dark:text-gray-100">
                     @if (session('success'))
-                        <div class="mb-4 p-4 bg-green-100 text-green-800 rounded">
+                        <div class="mb-4 p-4 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 rounded">
                             {{ session('success') }}
                         </div>
                     @endif
@@ -42,18 +42,18 @@
                                         <td class="px-6 py-4 whitespace-nowrap">{{ $site->backuppc_url }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap">{{ ucfirst($site->connection_method) }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            <span class="px-2 py-1 rounded text-sm {{ $site->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                            <span class="px-2 py-1 rounded text-sm {{ $site->is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300' }}">
                                                 {{ $site->is_active ? 'Active' : 'Inactive' }}
                                             </span>
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <a href="{{ route('sites.backups', $site) }}" class="text-blue-600 hover:text-blue-900 mr-2">View</a>
+                                        <td class="px-6 py-4 whitespace-nowrap font-medium">
+                                            <a href="{{ route('sites.backups', $site) }}" class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 mr-2">View</a>
                                             @if(Auth::user()->isAdmin())
-                                                <a href="{{ route('sites.edit', $site) }}" class="text-yellow-600 hover:text-yellow-900 mr-2">Edit</a>
+                                                <a href="{{ route('sites.edit', $site) }}" class="text-yellow-600 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-300 mr-2">Edit</a>
                                                 <form action="{{ route('sites.destroy', $site) }}" method="POST" class="inline">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="text-red-600 hover:text-red-900" onclick="return confirm('Are you sure?')">Delete</button>
+                                                    <button type="submit" class="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300" onclick="return confirm('Are you sure?')">Delete</button>
                                                 </form>
                                             @endif
                                         </td>

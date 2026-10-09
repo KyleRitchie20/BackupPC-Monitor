@@ -21,7 +21,7 @@
                             <div>
                                 <p><strong>Polling Interval:</strong> {{ $site->polling_interval }} minutes</p>
                                 <p><strong>Status:</strong>
-                                    <span class="px-2 py-1 rounded text-sm {{ $site->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                    <span class="px-2 py-1 rounded text-sm {{ $site->is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300' }}">
                                         {{ $site->is_active ? 'Active' : 'Inactive' }}
                                     </span>
                                 </p>
@@ -55,7 +55,7 @@
                     @endif
 
                     <div class="flex items-center justify-end mt-6">
-                        <a href="{{ route('sites.index') }}" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">
+                        <a href="{{ route('sites.index') }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600">
                             {{ __('Back to List') }}
                         </a>
                         @if(Auth::user()->isAdmin())

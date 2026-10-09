@@ -73,7 +73,7 @@
                             @endphp
                             <tr>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <a href="{{ route('sites.backups', $site) }}" class="text-blue-600 hover:text-blue-900">
+                                    <a href="{{ route('sites.backups', $site) }}" class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 font-medium">
                                         {{ $site->name }}
                                     </a>
                                 </td>
@@ -83,11 +83,11 @@
                                 <td class="px-6 py-4 whitespace-nowrap">{{ $summary['disk_usage'] }}%</td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     @if($hasAgent)
-                                        <span class="px-2 py-1 rounded text-sm {{ $agentActive ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
+                                        <span class="px-2 py-1 rounded text-sm {{ $agentActive ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300' }}">
                                             {{ $agentActive ? 'Agent Connected' : 'Agent Offline' }}
                                         </span>
                                     @else
-                                        <span class="px-2 py-1 rounded text-sm {{ $site->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                        <span class="px-2 py-1 rounded text-sm {{ $site->is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300' }}">
                                             {{ $site->is_active ? 'Active' : 'Inactive' }}
                                         </span>
                                     @endif
@@ -209,13 +209,13 @@
                                         <td class="px-6 py-4 whitespace-nowrap">{{ $backup->host_name }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             @if(str_contains($backup->state, 'backup_in_progress'))
-                                                <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-sm">In Progress</span>
+                                                <span class="px-2 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 rounded text-sm">In Progress</span>
                                             @elseif(str_contains($backup->state, 'idle') && $backup->error_message)
-                                                <span class="px-2 py-1 bg-red-100 text-red-800 rounded text-sm">Failed</span>
+                                                <span class="px-2 py-1 bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 rounded text-sm">Failed</span>
                                             @elseif(str_contains($backup->state, 'idle'))
-                                                <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">Success</span>
+                                                <span class="px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 rounded text-sm">Success</span>
                                             @else
-                                                <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">{{ $backup->state }}</span>
+                                                <span class="px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200 rounded text-sm">{{ $backup->state }}</span>
                                             @endif
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">

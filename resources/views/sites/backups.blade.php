@@ -10,7 +10,7 @@
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 dark:text-gray-100">
                     @if (session('success'))
-                        <div class="mb-4 p-4 bg-green-100 text-green-800 rounded">
+                        <div class="mb-4 p-4 bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 rounded">
                             {{ session('success') }}
                         </div>
                     @endif
@@ -18,7 +18,7 @@
                     <div class="flex justify-between items-center mb-6">
                         <h3 class="text-lg font-medium">Backup Hosts</h3>
                         <div class="flex space-x-2">
-                            <a href="{{ route('sites.show', $site) }}" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">
+                            <a href="{{ route('sites.show', $site) }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition">
                                 Site Details
                             </a>
                             @if(Auth::user()->isAdmin())
@@ -85,7 +85,7 @@
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <span class="px-2 py-1 rounded text-sm {{ $backup['statusClass'] }}">{{ $backup['status'] }}</span>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                                 {{ $backup['updated_at']->diffForHumans() }}
                                             </td>
                                         </tr>
