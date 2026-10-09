@@ -39,6 +39,20 @@ class BackupPCService
     }
 
     /**
+     * Get an available local TCP port for port forwarding
+     */
+    protected function getAvailableLocalPort(int $default = 18080): int
+    {
+        $sock = @socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+        if ($sock && @socket_bind($sock, '127.0.0.1', 0)) {
+            @socket_getsockname($sock, $addr, $port);
+            @socket_close($sock);
+            return (int) $port;
+        }
+        return $default;
+    }
+
+    /**
      * Fetch data via SSH tunnel
      */
     protected function fetchDataViaSSH(Site $site)
@@ -50,63 +64,91 @@ class BackupPCService
         $sshPassword = $site->ssh_password ? Crypt::decryptString($site->ssh_password) : null;
         Log::info('SSH password decrypted successfully');
 
-        // Extract host from BackupPC URL
+        // Extract host and port from BackupPC URL
         $backupHost = parse_url($site->backuppc_url, PHP_URL_HOST);
-        Log::info('BackupPC host extracted: ' . $backupHost);
+        $backupPort = parse_url($site->backuppc_url, PHP_URL_PORT) ?: 80;
+        Log::info('BackupPC host extracted: ' . $backupHost . ' (port ' . $backupPort . ')');
 
         if (!$backupHost) {
             Log::error('Failed to extract host from BackupPC URL: ' . $site->backuppc_url);
             return null;
         }
 
-        // Use SSH key-based authentication if available, otherwise use expect for password handling
-        // Password is passed via environment variable to avoid command-line exposure
-        $methods = [
-            'sshpass' => sprintf(
-                'SSH_PASSWORD=%s sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -L 8080:%s:80 %s@%s -p %d -N 2>/dev/null',
-                escapeshellarg($sshPassword),
-                $backupHost,
-                $site->ssh_username,
-                $site->ssh_host,
-                $site->ssh_port
-            ),
-            'expect' => sprintf(
-                'expect -c "spawn ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -L 8080:%s:80 %s@%s -p %d -N; expect \\"password:\\"; send \\"%s\\r\\"; interact" 2>/dev/null',
-                $backupHost,
-                $site->ssh_username,
-                $site->ssh_host,
-                $site->ssh_port,
-                escapeshellcmd($sshPassword)
-            ),
-            'direct' => sprintf(
-                'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -L 8080:%s:80 %s@%s -p %d -N 2>/dev/null',
-                $backupHost,
-                $site->ssh_username,
-                $site->ssh_host,
-                $site->ssh_port
-            )
+        $localPort = $this->getAvailableLocalPort();
+        Log::info("Using local tunnel port: {$localPort}");
+
+        // Build connection methods
+        $methods = [];
+
+        // 1. Password-based authentication via sshpass if password is provided
+        if (!empty($sshPassword)) {
+            $methods[] = [
+                'name' => 'sshpass',
+                'command' => [
+                    'sshpass', '-e',
+                    'ssh',
+                    '-o', 'BatchMode=no',
+                    '-o', 'StrictHostKeyChecking=no',
+                    '-o', 'UserKnownHostsFile=/dev/null',
+                    '-L', "{$localPort}:{$backupHost}:{$backupPort}",
+                    "{$site->ssh_username}@{$site->ssh_host}",
+                    '-p', (string) $site->ssh_port,
+                    '-N'
+                ],
+                'env' => ['SSHPASS' => $sshPassword]
+            ];
+        }
+
+        // 2. Key-based authentication (Strictly BatchMode=yes to avoid hanging on terminal password prompts)
+        $methods[] = [
+            'name' => 'key-based',
+            'command' => [
+                'ssh',
+                '-o', 'BatchMode=yes',
+                '-o', 'StrictHostKeyChecking=no',
+                '-o', 'UserKnownHostsFile=/dev/null',
+                '-L', "{$localPort}:{$backupHost}:{$backupPort}",
+                "{$site->ssh_username}@{$site->ssh_host}",
+                '-p', (string) $site->ssh_port,
+                '-N'
+            ],
+            'env' => []
         ];
 
         $tunnelProcess = null;
 
-        foreach ($methods as $method => $sshCommand) {
+        foreach ($methods as $methodConfig) {
+            $method = $methodConfig['name'];
             Log::info("Trying SSH method: $method");
-            Log::info("SSH command: $sshCommand");
 
             try {
-                $process = new Process(explode(' ', $sshCommand));
+                $process = new Process($methodConfig['command'], null, $methodConfig['env']);
                 $process->start();
 
-                // Wait for tunnel to establish
-                sleep(3);
+                // Wait up to 3 seconds for tunnel to be established
+                $established = false;
+                for ($attempt = 0; $attempt < 6; $attempt++) {
+                    usleep(500000); // 500ms
+                    if (!$process->isRunning()) {
+                        break;
+                    }
+                    $fp = @fsockopen('127.0.0.1', $localPort, $errno, $errstr, 0.5);
+                    if ($fp) {
+                        fclose($fp);
+                        $established = true;
+                        break;
+                    }
+                }
 
-                if ($process->isRunning()) {
-                    Log::info("SSH tunnel established using method: $method");
+                if ($established && $process->isRunning()) {
+                    Log::info("SSH tunnel established using method: $method on port $localPort");
                     $tunnelProcess = $process;
                     break;
                 } else {
-                    Log::error("SSH method $method failed to start");
-                    Log::error("Output: " . $process->getOutput());
+                    Log::error("SSH method $method failed to establish tunnel");
+                    if ($process->isRunning()) {
+                        $process->stop();
+                    }
                     Log::error("Error: " . $process->getErrorOutput());
                 }
             } catch (\Exception $e) {
@@ -133,7 +175,7 @@ class BackupPCService
                 $request->withBasicAuth($backuppcUsername, $backuppcPassword);
             }
 
-            $response = $request->get('http://localhost:8080/BackupPC/BackupPC_Admin?action=metrics&format=json');
+            $response = $request->get("http://localhost:{$localPort}/BackupPC/BackupPC_Admin?action=metrics&format=json");
 
             Log::info('API request completed with status: ' . $response->status());
 
